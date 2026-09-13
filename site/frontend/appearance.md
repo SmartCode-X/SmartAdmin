@@ -46,7 +46,7 @@ Icons are rendered **offline**: a handful of Iconify collections plus your own l
 
 `setupIcons()` (the kernel package's `lib/icons.ts`) is called exactly once by `createSmartAdmin()`, and registers two kinds of source through `smart-naive-icon`'s `setupSmartIcon`:
 
-- **Offline Iconify collections** — `ph` (Phosphor, the default set; only a generated subset is registered synchronously at startup, and `AppIcon` lazy-loads the full set for any name outside it), `lucide` (Lucide), `ep` (Element Plus), `ant-design` (Ant Design). Each is a separate lazy `@iconify-json/<prefix>` chunk, loaded only when first used.
+- **Offline Iconify collections** — `ph` (Phosphor, the default set), `lucide` (Lucide), `ep` (Element Plus), `ant-design` (Ant Design). Each is a separate lazy `@iconify-json/<prefix>` chunk, loaded only when first used. `ph` also has subsets registered synchronously at startup, covered in the next section.
 - **Local SVGs** — the kernel's own live in the package's `assets/svg/`; an app's own are glob-imported as raw strings and handed to `createSmartAdmin()`'s `icons` option:
 
 ```ts
@@ -58,6 +58,29 @@ createSmartAdmin({
   The filename minus `.svg` is the icon name — `src/assets/svg/star.svg` becomes selectable as `local:star`.
 
 The four built-in icon collections and the local SVGs are all bundled into the app itself, so rendering them never reaches out to an external CDN (such as `api.iconify.design`). That only holds as long as an icon is picked from `ph`/`lucide`/`ep`/`ant-design`/`local:` — the picker's "online" tab accepts any Iconify name at all, and names outside those five aren't part of the bundle, so they simply don't render in an offline deployment.
+
+## The `ph` subsets: one from the kernel, one from the app
+
+The full `ph` set is 9,000+ icons, about 946 KB gzipped, so only a subset is registered synchronously at startup; a name outside it makes `AppIcon` lazy-load the full set the first time it renders. The kernel's subset ships with the package, and an app generates its own from its `src` with the `smart-admin-icons` command the package provides:
+
+```bash
+npm run gen:icons               # the template's script, i.e. smart-admin-icons: scans src, writes src/assets/icons/ph-subset.json
+npx smart-admin-icons --check   # for CI: exits non-zero when the output is stale or an icon name is misspelled
+```
+
+The generated JSON goes to the kernel through `iconSets`, already wired in the template:
+
+```ts
+import phSubset from './assets/icons/ph-subset.json'
+
+createSmartAdmin({
+  iconSets: [phSubset],
+})
+```
+
+Whenever a page starts using a new `ph:*` name, run `npm run gen:icons` again. Forgetting doesn't break anything: the icon still renders, it just falls back to lazy-loading the full set. The scan covers `.vue`, `.ts`, `.tsx`, `.js`, `.jsx` and `.mjs` under `src`, skipping `*.spec.*`, `*.test.*` and `node_modules`. Names that never appear in page source, such as seed-menu icons, get picked up once they're written into any `.ts` under `src` — an exported array, for example.
+
+The app's subset doesn't drop names the kernel's subset already has. Duplicates are harmless, since the same icon name carries the same data. Subtracting the kernel's subset would tie the JSON an app commits to one kernel version: every kernel upgrade could make `--check` report it stale, and upgrading would no longer mean just bumping the version.
 
 ## Using an icon in a component
 

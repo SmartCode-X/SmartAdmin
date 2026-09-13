@@ -46,7 +46,7 @@ SmartAdmin 的外观由 CSS 自定义属性驱动，不是组件 props。变量�
 
 `setupIcons()`（内核包的 `lib/icons.ts`）由 `createSmartAdmin()` 调一次，靠 `smart-naive-icon` 的 `setupSmartIcon` 注册两类来源：
 
-- **离线 Iconify 集**：`ph`（Phosphor，默认集；启动时只同步注册一份按需生成的子集，子集外的名字由 `AppIcon` 懒加载整套）、`lucide`（Lucide）、`ep`（Element Plus）、`ant-design`（Ant Design）。每套是独立的懒加载 `@iconify-json/<prefix>` chunk，第一次用到才加载。
+- **离线 Iconify 集**：`ph`（Phosphor，默认集）、`lucide`（Lucide）、`ep`（Element Plus）、`ant-design`（Ant Design）。每套是独立的懒加载 `@iconify-json/<prefix>` chunk，第一次用到才加载。`ph` 另有子集在启动时同步注册，见下一节。
 - **本地 SVG**：内核自带的在包里的 `assets/svg/`，应用自己的以原始字符串 glob 进来，交给 `createSmartAdmin()` 的 `icons` 选项：
 
 ```ts
@@ -58,6 +58,29 @@ createSmartAdmin({
   文件名去掉 `.svg` 就是图标名，例如 `src/assets/svg/star.svg` 成为可选的 `local:star`。
 
 四套内置图标集和本地 SVG 都打进了应用本身，渲染它们不请求外部 CDN，比如 `api.iconify.design`。但有个前提：图标只能从 `ph`/`lucide`/`ep`/`ant-design`/`local:` 里选。选择器的「在线」页能输入任意 Iconify 名，可那些名字没打进包，离线环境里出不来。
+
+## `ph` 子集：内核一份，应用一份
+
+整套 `ph` 有 9000 多个图标，gzip 后约 946 KB，所以启动时同步注册的只是子集，子集外的名字第一次渲染时才由 `AppIcon` 懒加载整套。内核那份随包发布，应用那份用包里带的 `smart-admin-icons` 命令从自己的 `src` 生成：
+
+```bash
+npm run gen:icons               # 模板里的脚本，即 smart-admin-icons：扫 src，写出 src/assets/icons/ph-subset.json
+npx smart-admin-icons --check   # CI 用：产物过期或有拼错的图标名时非 0 退出
+```
+
+生成的 JSON 经 `iconSets` 交给内核，模板已经接好：
+
+```ts
+import phSubset from './assets/icons/ph-subset.json'
+
+createSmartAdmin({
+  iconSets: [phSubset],
+})
+```
+
+页面里用了新的 `ph:*` 名字，就重跑一次 `npm run gen:icons`。漏跑了图标照样出得来，只是退回懒加载整套。扫描范围是 `src` 下的 `.vue`、`.ts`、`.tsx`、`.js`、`.jsx`、`.mjs`，跳过 `*.spec.*`、`*.test.*` 和 `node_modules`。种子菜单这类名字不在页面源码里，写进 `src` 下任意一个 `.ts` 就会被扫进去，比如导出一个数组。
+
+应用那份不剔除内核子集里已有的名字。两份重名无害，同名图标的数据本来就相同。要是按内核的子集剔除，应用提交的这份 JSON 就绑死在某个内核版本上。内核一升级，`--check` 就可能报过期，升级也就不再是只改版本号。
 
 ## 在组件里用图标
 

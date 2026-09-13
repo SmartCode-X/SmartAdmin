@@ -47,10 +47,12 @@ The app's `main.ts` is a single call:
 ```ts
 import { createSmartAdmin } from 'smart-admin-web'
 import 'smart-admin-web/style.css'
+import phSubset from './assets/icons/ph-subset.json'
 
 createSmartAdmin({
   views: import.meta.glob('./views/**/*.vue'),
   locales: import.meta.glob('./locales/ext/*/*.ts', { eager: true }),
+  iconSets: [phSubset],
   apiBase: import.meta.env.VITE_API_BASE,
   dev: import.meta.env.DEV,
   version: __APP_VERSION__,
@@ -66,14 +68,16 @@ export function createSmartAdmin(options: SmartAdminOptions = {}): SmartAdminApp
 
   const layers: SmartAdminPlugin[] = [...(options.plugins ?? []), options]
   const icons: Record<string, string> = {}
+  const iconSets: IconifyJSON[] = []
   for (const layer of layers) {
     if (layer.views) registerViews(layer.views)
     if (layer.locales) registerLocales(layer.locales)
     if (layer.menuTitles) registerMenuTitles(layer.menuTitles)
     if (layer.icons) Object.assign(icons, layer.icons)
+    if (layer.iconSets) iconSets.push(...layer.iconSets)
     for (const route of layer.routes ?? []) router.addRoute(route)
   }
-  setupIcons(icons) // registers the offline sets (ph subset loaded synchronously) + local SVGs, no whole-set preload
+  setupIcons(icons, iconSets) // registers the offline sets (ph subsets loaded synchronously) + local SVGs, no whole-set preload
 
   window.addEventListener('unhandledrejection', e => {
     if (reloadOnChunkError(e.reason)) e.preventDefault()

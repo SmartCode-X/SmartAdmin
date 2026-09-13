@@ -154,4 +154,4 @@ FormContainer 的 `:fullscreen="true" | 'auto'` 建在 `useCompactScreen` 上,�
 
 ## IconPicker / AppIcon(smart-naive-icon)
 
-离线优先图标选择与渲染:包里的渲染器是 `SmartIcon`、选择器是 `SmartIconPicker`,应用里用内核的封装 `AppIcon`、`IconPicker`。初始化与包装见 `src/lib/icons.ts` 顶部注释、`src/components/IconPicker/index.vue`、`src/components/AppIcon.vue`。应用的本地 SVG 经 `createSmartAdmin({ icons: import.meta.glob('./assets/svg/*.svg', { query: '?raw', import: 'default', eager: true }) })` 注册,在选择器与 `AppIcon` 里以 `local:<文件名>` 使用。
+离线优先图标选择与渲染:包里的渲染器是 `SmartIcon`、选择器是 `SmartIconPicker`,应用里用内核的封装 `AppIcon`、`IconPicker`。初始化与包装见 `src/lib/icons.ts` 顶部注释、`src/components/IconPicker/index.vue`、`src/components/AppIcon.vue`。应用的本地 SVG 经 `createSmartAdmin({ icons: import.meta.glob('./assets/svg/*.svg', { query: '?raw', import: 'default', eager: true }) })` 注册,在选择器与 `AppIcon` 里以 `local:<文件名>` 使用。页面里用了新的 `ph:*` 名字就跑 `npm run gen:icons`(包带的 `smart-admin-icons` 命令),生成的子集经 `createSmartAdmin({ iconSets })` 启动时同步注册,不必懒加载整套 ph。

@@ -57,7 +57,7 @@ setupSmartIcon({
 
 每个 collection 在选择器里是一个 Tab。`collections` 里的第一个就是默认打开的那个，SmartAdmin 里是 `ph`。要哪些集，到 [icon-sets.iconify.design](https://icon-sets.iconify.design) 挑，记下 `prefix`，装对应的 `@iconify-json/<prefix>`。存下来的值带前缀，比如 `ant-design:home-outlined`，所以不管当初在哪个 Tab 选的，`AppIcon` 都能对上号。
 
-SmartAdmin 没有用 `preloadPrefix` 去预热某一整套集（`ph` 全集有 946 KB gz，首屏拉不起）。它另开一条路：`ph` 有一份按实际用到的名字生成的小子集，启动时同步注册进去，子集外的名字才由 `AppIcon` 懒加载整套 `ph`，见[主题与图标](/zh/frontend/appearance)。
+SmartAdmin 没有用 `preloadPrefix` 去预热某一整套集（`ph` 全集有 946 KB gz，首屏拉不起）。它另开一条路：启动时同步注册 `ph` 的子集，子集外的名字才由 `AppIcon` 懒加载整套 `ph`。子集有两份，内核的随包发布，应用的用 `smart-admin-icons` 从自己的 `src` 生成，见[主题与图标](/zh/frontend/appearance)。
 
 如果你**根本不调** `setupSmartIcon`，包自带一套 Lucide 作兜底，导入即用。它把 `@iconify-json/lucide` 列为运行时依赖。SmartAdmin 没走这条默认路，而是显式注册了 ph / lucide / ep / ant-design 四套。这份清单在内核包里，应用要补的图标走下一节的本地 SVG。
 

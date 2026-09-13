@@ -11,7 +11,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "gen:api": "node scripts/gen-api.mjs"
+    "gen:api": "node scripts/gen-api.mjs",
+    "gen:icons": "smart-admin-icons"
   },
   "dependencies": {
     "@iconify/vue": "^5.0.1",

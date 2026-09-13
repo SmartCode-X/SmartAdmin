@@ -49,6 +49,7 @@ createSmartAdmin({
 | `locales` | 文案。`locales/ext/<locale>/<命名空间>.ts` 默认导出该命名空间的键，按命名空间深合并进内置文案 |
 | `routes` | 布局壳之外的顶级静态路由，比如整屏看板、打印页 |
 | `icons` | 本地 SVG：`import.meta.glob('./assets/svg/*.svg', { query: '?raw', import: 'default', eager: true })` |
+| `iconSets` | 应用自己的 `ph` 图标子集，启动时同步注册。用包带的命令生成：`npx smart-admin-icons` 扫描 `src` 里的 `ph:*` 名字，写出 `src/assets/icons/ph-subset.json`；`--check` 给 CI 用 |
 | `menuTitles` | 菜单 path → i18n key，存量库的菜单标题是中文时用 |
 | `install(app)` | 需要 app 实例的注册：`registerHeaderTool`、`registerMenuBadge`、自己的 `app.use` |
 | `plugins` | 与上面同形的插件对象。覆盖顺序：内核 < 插件（按数组顺序）< 应用 |

@@ -5,8 +5,10 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { iconLoaded } from '@iconify/vue'
 import { describe, expect, it } from 'vitest'
 import subset from '#/assets/icons/ph-subset.json'
+import { setupIcons } from '#/lib/icons'
 
 // 离线 ph 子集是构建产物,靠脚本的 --check 钉住它没过期 —— 过期的后果是静默的:
 // 新加的图标在子集外,页面会退化成懒加载整集(4.5 MB),看着一切正常,只是首屏白胖了。
@@ -47,4 +49,19 @@ describe('ph 图标子集', () => {
     expect(subset.icons).toHaveProperty('dot-outline-duotone')
     expect(subset.icons).toHaveProperty('folder-duotone')
   })
+})
+
+// 消费方的子集(smart-admin-icons 生成)经 iconSets 交进来,启动时与内核子集一起同步入库,首帧就能离线渲染
+it('setupIcons 同步注册 iconSets 里内核子集之外的图标,内核子集照常在', () => {
+  expect(iconLoaded('ph:factory-duotone')).toBe(false)
+  setupIcons({}, [
+    {
+      prefix: 'ph',
+      icons: { 'factory-duotone': { body: '<path d="M0 0h8v8H0z"/>' } },
+      width: 256,
+      height: 256,
+    },
+  ])
+  expect(iconLoaded('ph:factory-duotone')).toBe(true)
+  expect(iconLoaded('ph:folder-duotone')).toBe(true)
 })

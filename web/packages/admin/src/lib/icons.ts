@@ -42,11 +42,18 @@ const kernelIcons = import.meta.glob('../assets/svg/*.svg', {
   eager: true,
 }) as Record<string, string>
 
-/** 首屏调用一次:同步装入 ph 子集,再注册离线集 + 本地 SVG(内核自带 + 消费方传入)。 */
-export function setupIcons(extraIcons: Record<string, string> = {}): void {
+/**
+ * 首屏调用一次:同步装入 ph 子集(内核的 + 消费方经 iconSets 传入的),再注册离线集 + 本地 SVG(内核自带 + 消费方传入)。
+ */
+export function setupIcons(
+  extraIcons: Record<string, string> = {},
+  extraSets: IconifyJSON[] = [],
+): void {
   // 子集同步入库,首帧即可离线渲染静态图标,不必等异步预热,也不会命中外部 CDN。
-  // 子集由 `npm run gen:icons` 从 src 里实际用到的名字 + 内核种子菜单的图标生成(scripts/gen-icon-subset.mjs)。
+  // 内核子集由 `npm run gen:icons` 从包的 src 与种子菜单图标生成(scripts/gen-icon-subset.mjs);
+  // 消费方的由 smart-admin-icons 从它自己的 src 生成。两份有重名也无妨,同名图标数据相同,后注册的覆盖前者。
   addCollection(phSubset as IconifyJSON)
+  for (const set of extraSets) addCollection(set)
   setupSmartIcon({
     collections,
     localIcons: { ...kernelIcons, ...extraIcons },

@@ -3,6 +3,7 @@ import { createPinia, type Pinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import type { RouteRecordRaw } from 'vue-router'
 import { SMART_TABLE_DEFAULTS, createSmartTableDefaults } from 'smart-naive-table'
+import type { IconifyJSON } from 'smart-naive-icon'
 import AppRoot from '#/App.vue'
 import { router } from '#/router'
 import { i18n, registerLocales, type ExtModule } from '#/locales'
@@ -30,6 +31,8 @@ export interface SmartAdminPlugin {
   menuTitles?: Record<string, string>
   /** 本地 SVG 图标:`import.meta.glob('./assets/svg/*.svg', { query: '?raw', import: 'default', eager: true })`。 */
   icons?: Record<string, string>
+  /** 离线图标子集:`smart-admin-icons` 从自己的 src 生成的 JSON(模板里是 npm run gen:icons),启动时同步注册。 */
+  iconSets?: IconifyJSON[]
   /** 需要 app 实例的注册动作(registerHeaderTool / registerMenuBadge / 自己的 app.use 等),在 mount 前调用。 */
   install?: (app: App) => void
 }
@@ -73,14 +76,16 @@ export function createSmartAdmin(options: SmartAdminOptions = {}): SmartAdminApp
 
   const layers: SmartAdminPlugin[] = [...(options.plugins ?? []), options]
   const icons: Record<string, string> = {}
+  const iconSets: IconifyJSON[] = []
   for (const layer of layers) {
     if (layer.views) registerViews(layer.views)
     if (layer.locales) registerLocales(layer.locales)
     if (layer.menuTitles) registerMenuTitles(layer.menuTitles)
     if (layer.icons) Object.assign(icons, layer.icons)
+    if (layer.iconSets) iconSets.push(...layer.iconSets)
     for (const route of layer.routes ?? []) router.addRoute(route)
   }
-  setupIcons(icons) // 注册离线图标集(ph 子集同步入库)+ 本地 SVG,不预热整集
+  setupIcons(icons, iconSets) // 注册离线图标集(ph 子集同步入库)+ 本地 SVG,不预热整集
 
   // 全局兜底:没有这两个监听的话,未捕获异常和发版后旧 chunk 404 都是白屏,控制台之外不留痕迹。
   // 渲染期异常由内容区的 ErrorBoundary 收口,这里管它够不着的两类:游离的 Promise 拒绝与预加载失败。
