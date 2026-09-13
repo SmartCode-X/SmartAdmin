@@ -1,0 +1,166 @@
+/* 全局基础样式 + 密度变量。tokens.css 已先行 import(包入口 index.ts 的顺序)。 */
+
+:root {
+  /* 内容区留白取 14 / 12:后台常见的 1366×768 显示器上,24px 的留白四边加起来吃掉近 50px,
+     表格要少显示一行。改这里全站生效。 */
+  --pad-page: 14px;
+  --gap-card: 12px;
+  --row-h: 58px;
+  --sidebar-w: 236px;
+  --sidebar-w-collapsed: 76px;
+  --rail-w: 64px;
+  --header-h: 62px;
+}
+
+/* 紧凑档:页内边距 / 卡片间距 / 表格行高收紧(design_handoff 密度档)。 */
+:root[data-density='compact'] {
+  --pad-page: 10px;
+  --gap-card: 8px;
+  --row-h: 48px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--color-text-primary);
+  background: var(--color-bg-app); /* 页面画布走 --color-bg-app:浅色护眼绿渐变 / 暗色深蓝黑渐变 */
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme='dark'] body {
+  background-attachment: fixed; /* 深色渐变固定视口,滚动时背景不漂移 */
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 质感层(spike/theme-refresh,手法源自 XiHan/soybean 调研)─────────
+   容器走描边不走阴影:shadow-sm 亮色几乎隐形、暗色彻底失效;
+   1px 边框 + 圆角在亮暗两态都有清晰轮廓(XiHan .pane 派)。
+   Naive bordered 卡片自带同值边框(themeOverrides borderColor),此规则只补 bordered=false 的。 */
+.n-card {
+  border: 1px solid var(--color-border);
+}
+
+/* 浅色玻璃卡片:半透明白底 + 柔和绿背景,护眼且保留卡片层次。
+   排除弹窗:玻璃底透出的是 --color-mask 深色遮罩,弹窗会整体发灰,与内部灰底控件糊在一起。 */
+:root:not([data-theme='dark']) .n-card:not(.n-modal) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.68));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 8px 24px rgba(45, 105, 90, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* 弹窗走实底白 + 投影拉层级,让内部填充色/边框有干净的对比基准。 */
+:root:not([data-theme='dark']) .n-card.n-modal {
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-3);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 暗色卡片:平涂深蓝黑,贴近背景且不带高光/毛玻璃,保证表格区域清晰。 */
+:root[data-theme='dark'] .n-card {
+  background: #121c2e; /* 暗色卡片贴近背景深蓝黑,去掉高光/毛玻璃,整体更清晰 */
+  border-color: rgba(71, 85, 105, 0.4);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.22);
+}
+
+/* 暗色滚动条 / 选区跟随 slate + teal,不用亮色灰。 */
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.52);
+}
+:root[data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+:root[data-theme='dark'] ::selection {
+  background: rgba(20, 184, 166, 0.28);
+  color: #ecfeff;
+}
+
+/* 主题切换过渡:仅切换瞬间启用颜色/边框/阴影过渡,不盖整屏淡化层,文字切换后立即清晰。 */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition:
+    background-color 0.22s ease,
+    color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease !important;
+}
+
+/* 6px 半透明圆角滚动条,track 透明(XiHan design/scrollbar.css 同款)。 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(144, 147, 153, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(144, 147, 153, 0.7);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 灰阶:整页 filter(随 app.grayscale 由 useTheme 打在 <html>)。用于哀悼日等场景。 */
+html[data-gray] {
+  filter: grayscale(1);
+}
+
+/* 页面切换动画(default.vue 的 <transition :name="app.pageTransition">)。 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease;
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateX(16px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-16px);
+}
+
+/* 导航菜单禁选中:n-menu 的项是「按钮」不是「文本」,但浏览器仍把标签当可选文本 ——
+   展开子菜单时内容在指针下方位移(手风琴动画),按下-抬起被判定成拖拽选区,
+   于是整段菜单文字被刷上蓝色选中底色(双击菜单项同理)。整棵菜单禁选即可,
+   折叠态弹出的 dropdown 菜单同源同理。 */
+.n-menu,
+.n-dropdown-menu {
+  user-select: none;
+  -webkit-user-select: none;
+}

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- xunit v3 的测试项目自己就是可执行程序(Microsoft.Testing.Platform),不是被 vstest 加载的类库 -->
+    <OutputType>Exe</OutputType>
+    <!-- xUnit1051:v3 分析器要求每个接受 CancellationToken 的调用都传 TestContext.Current.CancellationToken;
+         这个冒烟用例是跑到底的,没有中途取消场景 -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 通配,不写项目名字面量:`dotnet new` 生成含连字符的项目名时,文件名保留连字符、
+         文件内容里的连字符被安全化成下划线,两者对不上;通配绕开这处错位(同 Dockerfile)。 -->
+    <ProjectReference Include="..\*.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.0" />
+    <!-- 必须直接引:它的 build targets(定位宿主 ContentRoot)只对直接引用方生效,经 SmartAdmin.Testing 传递拿不到 -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
+    <!-- 内核的测试基础设施:AdminAppFactory<Program>(一次性库 + 固定超管密码 / JWT 密钥)、
+         TestDb(按 SMART_TEST_DBTYPE 切四种方言)、PostJson / ReadEnvelope / LoginToken。版本与内核包一致 -->
+    <PackageReference Include="SmartAdmin.Testing" Version="SMART_PKG_VERSION" />
+  </ItemGroup>
+
+</Project>

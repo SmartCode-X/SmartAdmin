@@ -1,0 +1,76 @@
+### SmartAdmin 示例宿主 —— 文件
+# 跑「上传」前先往本目录放一个 sample.png:后缀白名单默认只放行
+# .jpg/.png/.pdf/.xlsx/.docx/.zip(配置键 sys.upload.allowedExtensions)。
+# 注意:带文件体的 multipart 在 VS Code REST Client 与 Rider 里可用,VS 2022 的 .http 编辑器不支持
+# 「用文件路径当请求体」,那边请改用别的方式传这一条。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 上传单个文件 —— 表单字段名必须是 file
+# 出参里的 viewUrl 是签名直链(相对路径),storagePath 是存储层的内部路径,别拿它当 URL 用
+# @name upload
+POST {{host}}/api/v1/sys/file/upload
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: multipart/form-data; boundary=SmartAdminBoundary
+
+--SmartAdminBoundary
+Content-Disposition: form-data; name="file"; filename="sample.png"
+Content-Type: image/png
+
+< ./sample.png
+--SmartAdminBoundary--
+
+### 分页查询文件记录(按上传时间倒序)
+GET {{host}}/api/v1/sys/file/page?current=1&size=10
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 下载 —— 以原始文件名回传,浏览器另存
+GET {{host}}/api/v1/sys/file/{{upload.response.body.$.data.id}}/download
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 签名直链 —— 匿名可访问,给 <img src> 这类带不了 Authorization 头的场景用
+# 匿名但不可伪造:sig 是文件 Id 的 HMAC,错一个字符就是 403。
+# 把上传出参里的 viewUrl 整个粘到 @viewUrl(它已经带好了 sig,必要时还带 exp)。
+@viewUrl = <粘贴上传出参里的 viewUrl>
+
+GET {{host}}{{viewUrl}}
+
+### 软删除文件记录 —— 物理文件由后台回收任务在保留期后才删
+DELETE {{host}}/api/v1/sys/file/{{upload.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 批量软删除
+POST {{host}}/api/v1/sys/file/batch-delete
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "ids": []
+}
+
+### 分片上传-初始化 —— 秒传探测(同哈希已存在直接复用)+ 返回已收分片(断点续传)
+# 完整的分片流程要客户端先算整文件 SHA-256 再切片,手工用 .http 走不完;这里只放初始化一条,
+# 让人看清入参形状。后续 POST /chunk(multipart:uploadId + index + chunk)与 POST /chunk/complete 交给代码。
+POST {{host}}/api/v1/sys/file/chunk/init
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "fileHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "fileName": "big.zip",
+  "totalSize": 10485760,
+  "chunkCount": 3,
+  "contentType": "application/zip"
+}

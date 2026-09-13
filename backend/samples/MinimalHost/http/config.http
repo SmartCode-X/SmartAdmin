@@ -1,0 +1,87 @@
+### SmartAdmin 示例宿主 —— 系统配置
+# 配置中心是运行期开关的落点:密码策略、登录锁定、会话时长、限流、验证码、TOTP 都在这儿改,改完即时生效。
+# 所以写操作都挂了 [OperationLog] 留痕,也都挂了 [RequireReauth](TOTP 关闭时是空操作)。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 分页查询配置 —— groupCode 精确过滤:sys 站点 / security 安全 / upload 上传 / job 任务
+GET {{host}}/api/v1/sys/config/page?current=1&size=20&groupCode=security
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 按键取值(读穿透缓存)
+GET {{host}}/api/v1/sys/config/value/sys.security.password.minLength
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 当前生效的密码策略 —— [ActiveSession],改密页/建用户页据此展示规则清单
+GET {{host}}/api/v1/sys/config/password-policy
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 批量按键回写值 —— 分类配置中心那种结构化表单的保存动作,body 是数组
+# 只改值,不碰 name/groupCode/sort。下面这条把密码最小长度改成 10、并要求特殊字符
+PUT {{host}}/api/v1/sys/config/batch
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+[
+  { "configKey": "sys.security.password.minLength", "configValue": "10" },
+  { "configKey": "sys.security.password.requireSpecial", "configValue": "true" }
+]
+
+### 改回默认(跑完上一条记得跑这条,否则后面建用户会撞 PasswordTooWeak)
+PUT {{host}}/api/v1/sys/config/batch
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+[
+  { "configKey": "sys.security.password.minLength", "configValue": "8" },
+  { "configKey": "sys.security.password.requireSpecial", "configValue": "false" }
+]
+
+### 新增配置 —— configKey 唯一,创建后不可改
+# @name addConfig
+POST {{host}}/api/v1/sys/config
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "configKey": "demo.hello",
+  "configValue": "world",
+  "name": "示例配置",
+  "groupCode": "demo",
+  "sort": 1,
+  "remark": "http 样例建出来的配置"
+}
+
+### 配置详情
+GET {{host}}/api/v1/sys/config/{{addConfig.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 更新配置 —— configKey 传了也不生效
+PUT {{host}}/api/v1/sys/config/{{addConfig.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "configKey": "demo.hello",
+  "configValue": "world!",
+  "name": "示例配置(已改名)",
+  "groupCode": "demo",
+  "sort": 2,
+  "remark": null
+}
+
+### 软删除配置
+DELETE {{host}}/api/v1/sys/config/{{addConfig.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}

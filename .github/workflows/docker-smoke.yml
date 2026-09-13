@@ -1,0 +1,133 @@
+# 容器化交付冒烟。两条腿刻意分开：
+#   single：镜像能起、首启建表 + 种子、能签发令牌（生产首启路径的实测）。
+#   multi ：两个副本经 Caddy 轮询，验的是只有双副本同时在线才暴露的保证
+#           （跨副本强退、锁定阈值不翻倍、集群级限流、WorkerId 互异、真实客户端 IP、调度单主）。
+name: docker-smoke
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'backend/**'
+      - 'web/Dockerfile'
+      - 'web/Caddyfile'
+      - 'web/nginx.conf'
+      - '.env.example'
+      - 'scripts/**'
+      - '.github/workflows/docker-smoke.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'backend/**'
+      - 'web/Dockerfile'
+      - 'web/Caddyfile'
+      - 'web/nginx.conf'
+      - '.env.example'
+      - 'scripts/**'
+      - '.github/workflows/docker-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# compose 里这三个是强制变量（${VAR:?}），不给就直接拒绝启动——不拿演示密钥当默认值。
+# CI 用一次性值，名字改了两边都要改，否则 up 会当场报缺变量。
+env:
+  SMART_JWT_SECRET: docker-smoke-ci-signing-key-please-keep-32plus-bytes
+  SMART_DB_PASSWORD: docker-smoke-ci-db
+  SMART_ADMIN_PASSWORD: Smart@123456
+  TRIVY_CACHE_DIR: /tmp/trivy-cache
+
+concurrency:
+  group: docker-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  single:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - name: Up
+        run: docker compose up -d --build
+      - name: Wait for /health through Caddy
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then echo "healthy after $((i * 2))s"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::app never became healthy"
+          exit 1
+      - name: First start proves tables + seed + token
+        run: |
+          body=$(curl -fsS -X POST http://localhost:8080/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"account":"superAdmin","password":"Smart@123456"}')
+          echo "${body:0:200}"
+          echo "$body" | grep -q '"accessToken"' || { echo "::error::login did not return an access token"; exit 1; }
+      # 镜像扫描。刚 build 出来的两个镜像就在本机 daemon 里，直接扫，不用先推仓库。
+      # CRITICAL 拦下、HIGH 只报告：基础镜像上常年挂着几条没有修复版本的 HIGH，
+      # 拿它当红灯只会训练出「CI 红了先重跑」的习惯，那比不扫更糟。
+      - name: Trivy report (app image, HIGH + CRITICAL, non-blocking)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
+        with:
+          image-ref: smart-admin-app
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+      - name: Trivy gate (app image, CRITICAL, blocking)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
+        with:
+          image-ref: smart-admin-app
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          skip-setup-trivy: true
+          exit-code: "1"
+      - name: Trivy report (web image, HIGH + CRITICAL, non-blocking)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
+        with:
+          image-ref: smart-admin-web
+          trivyignores: .trivyignore.yaml
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          skip-setup-trivy: true
+          exit-code: "0"
+      - name: Trivy gate (web image, CRITICAL, blocking)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25   # v0.36.0
+        with:
+          image-ref: smart-admin-web
+          trivyignores: .trivyignore.yaml
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          skip-setup-trivy: true
+          exit-code: "1"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color | tail -300
+      - name: Down
+        if: always()
+        run: docker compose down -v
+
+  multi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - name: Up (two replicas behind Caddy)
+        run: docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --build
+      - name: Cross-replica guarantees
+        run: bash scripts/smoke-multi-replica.sh http://localhost:8080
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.scale.yml logs --no-color | tail -400
+      - name: Down
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.scale.yml down -v

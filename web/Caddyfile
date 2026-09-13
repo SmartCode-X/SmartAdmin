@@ -1,0 +1,97 @@
+# 前端静态托管 + /api 反代(文档站路线 B 的默认代理,见 https://smartcode-x.github.io/SmartAdmin/zh/guide/deployment/route-b)。
+# 浏览器只看到一个源,因此**不需要 CORS**(后端默认 deny-all,不必为此开口子)。
+#
+# 为什么默认是 Caddy 而不是 nginx:真上域名时把下面的 `:8080` 换成 `admin.example.com`,
+# Caddy 会**自动申请并续期 Let's Encrypt 证书** —— 对一个要被别人自托管的内核来说,
+# "不用手工搞 TLS"是实打实的减负。已有 nginx 网关的照抄 web/nginx.conf。
+
+{
+	# 本地/CI 冒烟没有域名,签不到证书。不关掉的话 Caddy 会在启动时卡在 ACME 上。
+	# 真实部署把站点标签换成域名并删掉这行,自动 HTTPS 即生效。
+	auto_https off
+}
+
+# 端口是 8080 不是 80:镜像里 Caddy 以 UID 10001 运行。理由与坑写在 web/Dockerfile 的运行阶段。
+# 对外仍是 80/443,由 compose 的端口映射或上游网关做转换。
+:8080 {
+	# ── 安全响应头 ─────────────────────────────────────────────────────────────
+	# 写在 handle 块外面:header 的执行阶段排在 handle 之前,所以静态文件、反代回来的 API 响应
+	# 都会带上,不用在每个 handle 里重复一遍。
+	#   nosniff       浏览器不再按内容猜 MIME —— 上传的文本被猜成 HTML 就是一次存储型 XSS
+	#   SAMEORIGIN    不用 DENY:消费者把后台嵌进自己门户的 iframe 是真实场景,DENY 会直接嵌不了
+	#   Referrer      跨源只发源,免得把带 id 的后台路径漏进第三方的 Referer 日志
+	#   Permissions   摄像头、麦克风、定位一律关掉,后台用不上
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# HSTS 只在真跑 https 时给。http 上给了没有意义,而一旦给错(比如内网 http 站点),
+	# 浏览器会记住这条策略,之后拒绝再用 http 访问 —— 撤不回来,只能等 max-age 过期。
+	# 由外层网关终结 TLS 时,这条由那个网关来发。
+	@https expression `{scheme} == "https"`
+	header @https Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# 上传大小上限要 ≥ SmartAdmin:Upload:MaxSizeMb(默认 20MB)。
+	request_body {
+		max_size 32MB
+	}
+
+	# ── 必须用 handle 块,不能把 reverse_proxy 和 try_files 平铺在一起 ──────────────
+	# Caddy 按**内置的指令顺序**执行,不按书写顺序:try_files 属于 rewrite 阶段,**早于** reverse_proxy。
+	# 平铺写法下,/api/... 这种在磁盘上找不到对应文件的路径会先被 try_files 改写成 /index.html,
+	# 于是 API 请求拿到的是一张 HTML —— 前端整个连不上后端,症状是登录直接返回空。
+	# handle 块彼此互斥、按书写顺序匹配,命中即止,try_files 只作用于兜底那一块。
+
+	# upstream 可以有多个(见 docker-compose.scale.yml 的双副本),Caddy 默认轮询 → 它就是那套验收的负载均衡器。
+	# reverse_proxy 会自动写 X-Forwarded-For / X-Forwarded-Proto ——
+	# 后端要真正采信它,还需配 SmartAdmin:Api:ForwardedHeaders(受信网段),否则限流按 IP 分区形同虚设。
+	# 多上游时(docker-compose.scale.yml):lb_try_duration 让单次请求在上游挂了后改试别的副本,
+	# 避免 docker stop 一个 app 后 Caddy 仍把一半流量打到死节点、冒烟拿到空 body / 502。
+	# health_uri 主动摘掉不健康上游;单副本时列表只有一个,行为不变。
+	handle /api/* {
+		reverse_proxy {$SMART_UPSTREAMS:app:8080} {
+			lb_try_duration 2s
+			fail_duration 10s
+			max_fails 1
+			health_uri /health
+			health_interval 2s
+			health_timeout 1s
+		}
+	}
+
+	# SignalR 实时通知 Hub(强制下线、未读刷新):Caddy 的 reverse_proxy **自动处理 WebSocket 升级**,
+	# 无需像 nginx 那样手写 Upgrade/Connection 头。漏掉这块,实时通知会静默退化成 30s 轮询。
+	handle /hub/* {
+		reverse_proxy {$SMART_UPSTREAMS:app:8080} {
+			lb_try_duration 2s
+			fail_duration 10s
+			max_fails 1
+			health_uri /health
+			health_interval 2s
+			health_timeout 1s
+		}
+	}
+
+	# 探针:编排层/负载均衡直接探这里,不必知道后端在哪
+	handle /health* {
+		reverse_proxy {$SMART_UPSTREAMS:app:8080} {
+			lb_try_duration 2s
+			fail_duration 10s
+			max_fails 1
+			health_uri /health
+			health_interval 2s
+			health_timeout 1s
+		}
+	}
+
+	# 兜底:前端 history 路由,未命中静态文件就交给 SPA 自己解析(深链刷新不 404)
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    // 这几处下划线前缀都改不动,而这条规则只认命名不认来由:
+    //   `__APP_VERSION__` / `__SMART_ADMIN_VERSION__` 是 template 与内核包 vite.config 的 define 契约;
+    //   `_fallback` 是后端 msgKey 约定里的兜底键;
+    //   `_ensureActive` 是 tabs store 里刻意标记为「内部动作」的命名。
+    "no-underscore-dangle": "off"
+  },
+  "env": {
+    "builtin": true,
+    "browser": true,
+    "es2024": true
+  },
+  "ignorePatterns": ["**/dist", "**/schema.d.ts"]
+}

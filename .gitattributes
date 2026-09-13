@@ -1,0 +1,10 @@
+# 规范化行尾：仓库中始终使用 LF，检出时按平台自动转换
+* text=auto eol=lf
+
+# 显式标记二进制/资源类型，避免意外修改
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary
+*.woff binary
+*.woff2 binary

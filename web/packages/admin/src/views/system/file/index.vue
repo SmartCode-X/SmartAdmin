@@ -1,0 +1,165 @@
+<script setup lang="ts">
+// 文件管理 = 只读 SmartTable(搜索 originalName→FileName)+ 工具栏 FileUpload 触发器 + 行内下载/删除。
+// 下载走 blob(Bearer 自动带)→ createObjectURL + <a download> + revoke;删除走 useConfirm。
+import { h, ref } from 'vue'
+import { NButton, NSpace, NPopconfirm, useMessage } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
+import { SmartTable, type SmartTableColumn, type SmartTableInst } from 'smart-naive-table'
+import AppIcon from '#/components/AppIcon.vue'
+import FileUpload from '#/components/FileUpload/index.vue'
+import { useConfirm } from '#/composables/useConfirm'
+import { useBatchDelete } from '#/composables/useBatchDelete'
+import { useAuthStore } from '#/stores/auth'
+import { fileApi } from '#/api'
+import { translateError } from '#/utils/error'
+import { fmtBytes } from '#/utils/format'
+import type { SysFile } from '#/types/api'
+
+const { t } = useI18n()
+const message = useMessage()
+const { run } = useConfirm()
+const authStore = useAuthStore()
+const tableRef = ref<SmartTableInst<SysFile>>()
+const {
+  checkedKeys,
+  hasSelection,
+  run: batchDelete,
+} = useBatchDelete({
+  remove: fileApi.batchRemove,
+  refresh: () => tableRef.value?.refresh(),
+  successMsg: t('file.deleted'),
+})
+
+function onUploaded() {
+  message.success(t('file.uploaded'))
+  tableRef.value?.refresh()
+}
+
+async function download(r: SysFile) {
+  try {
+    const blob = await fileApi.download(r.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = r.originalName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    message.error(translateError(e))
+  }
+}
+
+const columns: SmartTableColumn<SysFile>[] = [
+  { type: 'selection' },
+
+  { type: 'index', title: () => t('common.rowNo'), width: 64, align: 'center' },
+  { key: 'originalName', title: () => t('file.name'), search: true, ellipsis: { tooltip: true } },
+  {
+    key: 'extension',
+    title: () => t('file.extension'),
+    width: 90,
+    render: r => r.extension || '—',
+  },
+  {
+    key: 'sizeBytes',
+    title: () => t('file.size'),
+    width: 110,
+    render: r => fmtBytes(r.sizeBytes),
+  },
+  {
+    key: 'contentType',
+    title: () => t('file.contentType'),
+    ellipsis: { tooltip: true },
+    render: r => r.contentType || '—',
+  },
+  { key: 'createTime', title: () => t('file.uploadTime'), format: 'datetime' },
+  {
+    key: 'op',
+    title: () => t('common.operation'),
+    width: 140,
+    fixed: 'right',
+    hideInSetting: true,
+    render: r =>
+      h(NSpace, { size: 4, wrapItem: false }, () => [
+        authStore.hasPerm('GET:/api/v1/sys/file/{id}/download')
+          ? h(
+              NButton,
+              { size: 'small', quaternary: true, type: 'primary', onClick: () => download(r) },
+              {
+                default: () => t('file.download'),
+                icon: () => h(AppIcon, { icon: 'ph:download-simple', size: 15 }),
+              },
+            )
+          : null,
+        authStore.hasPerm('DELETE:/api/v1/sys/file/{id}')
+          ? h(
+              NPopconfirm,
+              {
+                onPositiveClick: () =>
+                  run(() => fileApi.remove(r.id), t('file.deleted')).then(ok => {
+                    if (ok) tableRef.value?.refresh()
+                  }),
+              },
+              {
+                trigger: () =>
+                  h(NButton, { size: 'small', quaternary: true, type: 'error' }, () =>
+                    t('common.delete'),
+                  ),
+                default: () => t('file.deleteConfirm', { name: r.originalName }),
+              },
+            )
+          : null,
+      ]),
+  },
+]
+</script>
+
+<template>
+  <SmartTable
+    :default-page-size="100"
+    ref="tableRef"
+    :columns="columns"
+    :fetcher="fileApi.page"
+    flex-height
+    virtual-scroll
+    storage-key="sys-file"
+    :checked-row-keys="checkedKeys"
+    @update:checked-row-keys="(keys: (string | number)[]) => (checkedKeys = keys)"
+    @error="e => message.error(translateError(e))"
+  >
+    <template #toolbar>
+      <FileUpload
+        v-auth="'POST:/api/v1/sys/file/upload'"
+        :show-file-list="false"
+        @uploaded="onUploaded"
+      >
+        <n-button type="primary">
+          <template #icon><AppIcon icon="ph:upload-simple" :size="16" /></template>
+          {{ t('file.upload') }}
+        </n-button>
+      </FileUpload>
+      <FileUpload
+        v-auth="'POST:/api/v1/sys/file/chunk/init'"
+        chunked
+        :show-file-list="false"
+        @uploaded="onUploaded"
+      >
+        <n-button>
+          <template #icon><AppIcon icon="ph:stack" :size="16" /></template>
+          {{ t('file.uploadChunked') }}
+        </n-button>
+      </FileUpload>
+      <n-button
+        v-auth="'POST:/api/v1/sys/file/batch-delete'"
+        type="error"
+        :disabled="!hasSelection"
+        @click="batchDelete"
+      >
+        <template #icon><AppIcon icon="ph:trash" :size="16" /></template>
+        {{ t('common.batchDelete') }}
+      </n-button>
+    </template>
+  </SmartTable>
+</template>

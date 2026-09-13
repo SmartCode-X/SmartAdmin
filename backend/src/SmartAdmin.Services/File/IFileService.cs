@@ -1,0 +1,45 @@
+using SmartAdmin.Core;
+
+namespace SmartAdmin.Services;
+
+/// <summary>
+/// 文件服务——上传(校验 + 重写名 + 落存储 + 记账)、下载、分页列表、删除。
+/// 安全不变量:后缀白名单、大小上限、文件名重写、路径穿越防护(见 <c>FileService</c> / <c>LocalFileStorage</c>)。
+/// </summary>
+public interface IFileService
+{
+    /// <summary>
+    /// 上传:校验后缀白名单/大小 → 重写成安全存储名 → 交 <c>IFileStorage</c> 落盘 → 写 <c>sys_file</c> 记录。
+    /// 失败抛 <see cref="ErrorCode"/> 44xxx 段(空文件/超大/后缀不允许)。
+    /// </summary>
+    Task<FileUploadOutput> UploadAsync(FileUploadInput input);
+
+    /// <summary>按 Id 打开下载载荷;记录或物理文件不存在抛 <see cref="ErrorCode.FileNotFound"/>。</summary>
+    Task<FileDownload> DownloadAsync(long id);
+
+    /// <summary>分页查询文件记录(按上传时间倒序)。</summary>
+    Task<PagedList<SysFile>> PageAsync(FilePageInput input);
+
+    /// <summary>软删除文件记录(物理文件保留,回收留给清理任务);不存在抛 <see cref="ErrorCode.FileNotFound"/>。</summary>
+    Task DeleteAsync(long id);
+
+    /// <summary>批量软删除文件记录(物理文件同样保留);不存在的 Id 静默跳过。</summary>
+    Task DeleteBatchAsync(IReadOnlyCollection<long> ids);
+
+    // ── 分片 / 断点续传上传 ──────────────────────────
+
+    /// <summary>
+    /// 分片上传初始化:按内容哈希探测<b>秒传</b>(命中直接复用既有文件),否则返回 uploadId +
+    /// 已收分片下标(<b>断点续传</b>)。
+    /// </summary>
+    Task<ChunkInitOutput> ChunkInitAsync(ChunkInitInput input);
+
+    /// <summary>保存单个分片(幂等:重传覆盖)。</summary>
+    Task SaveChunkAsync(ChunkSaveInput input);
+
+    /// <summary>
+    /// 分片上传完成:按序合并 → 校验合并后哈希与声明一致 → 复用上传三道关(大小/后缀)→ 落存储 + 记账。
+    /// 缺片抛 <see cref="ErrorCode.ChunkMissing"/>,哈希不符抛 <see cref="ErrorCode.ChunkHashMismatch"/>。
+    /// </summary>
+    Task<FileUploadOutput> ChunkCompleteAsync(ChunkCompleteInput input);
+}

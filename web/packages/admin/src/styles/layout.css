@@ -1,0 +1,502 @@
+/* 页面形状与高度链:侧栏筛选面板、弹窗表单分节、满屏列表页(整页吃满一屏,滚动只发生在表体里)。
+   类名即约定:新页面按下文「五种页面形状」选一种套上即可,不必再抄 :deep 链。 */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   侧栏筛选面板:「左筛选 + 右列表」页面的公共外观。
+   放全局而非各页 scoped —— 这是站内约定的一套外观,新页面套类名即可,不必再抄一遍。
+   宽度用 --side-filter-width 覆盖(树形分类要比平铺分类宽一点)。
+   ══════════════════════════════════════════════════════════════════════════ */
+.side-filter {
+  flex: 0 0 var(--side-filter-width, 224px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 12px 10px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-bg-container);
+  box-shadow: var(--shadow-1);
+  transition: flex-basis var(--transition-base, 0.2s ease);
+}
+
+.side-filter__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 24px;
+  padding-left: 6px;
+}
+
+/* 面板不放标题:紧挨着的第一行就是「全部分类」,再写一遍分类名是重复。
+   头部只剩操作按钮,故靠 margin-left 顶到右边。 */
+.side-filter__actions {
+  display: flex;
+  flex: none;
+  margin-left: auto;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 滚动区:面板里除头部与搜索框以外的全部内容 */
+.side-filter__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.side-filter__divider {
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--color-border);
+}
+
+.side-filter__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm, 13px);
+}
+
+/* 面板里的一行(平铺分类用;树形分类的行由 .side-tree 统一到同一套观感)。 */
+.side-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-md, 10px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-base, 14px);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast, 0.15s ease),
+    color var(--transition-fast, 0.15s ease);
+}
+
+.side-row:hover {
+  background: var(--color-fill-hover);
+  color: var(--color-text-primary);
+}
+
+.side-row.is-active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+/* 选中行左侧的主色指示条:比单纯换底色更能说明「当前在哪一类」。 */
+.side-row.is-active::before,
+.side-tree .n-tree-node--selected::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 3px;
+  height: 16px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary);
+  transform: translateY(-50%);
+}
+
+.side-row__icon,
+.side-row__dot {
+  flex: none;
+}
+
+.side-row__dot {
+  width: 6px;
+  height: 6px;
+  margin: 0 4px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  transition: background var(--transition-fast, 0.15s ease);
+}
+
+.side-row:hover .side-row__dot {
+  background: var(--color-text-tertiary);
+}
+
+.side-row.is-active .side-row__dot {
+  background: currentcolor;
+}
+
+.side-row__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.side-row__count {
+  flex: none;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--color-fill);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs, 12px);
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+  transition:
+    background var(--transition-fast, 0.15s ease),
+    color var(--transition-fast, 0.15s ease);
+}
+
+.side-row.is-active .side-row__count {
+  background: var(--color-primary);
+  color: var(--color-white, #fff);
+}
+
+/* ── 树形分类:颜色/圆角/行高走 NTree 的 theme-overrides,这里只补它没暴露的几处 ── */
+.side-tree.n-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.side-tree .n-tree-node {
+  position: relative;
+  padding-right: 4px;
+}
+
+.side-tree .n-tree-node--selected .n-tree-node-content__text {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+/* 行操作按钮平时隐身,悬浮/选中才出现 —— 静态时保持一栏干净的文字。 */
+.side-tree .n-tree-node-content__suffix {
+  opacity: 0;
+  transition: opacity var(--transition-fast, 0.15s ease);
+}
+
+.side-tree .n-tree-node:hover .n-tree-node-content__suffix,
+.side-tree .n-tree-node--selected .n-tree-node-content__suffix {
+  opacity: 1;
+}
+
+.side-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 窄屏优先保表格:侧栏收窄,不换行(树本身能横向滚动)。 */
+@media (max-width: 1280px) {
+  .side-filter {
+    flex-basis: min(var(--side-filter-width, 224px), 200px);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   弹窗表单分节:节间距 + 小节标题。放在全局是因为这一个视觉元素会被十几个页面的
+   scoped <style> 各自实现一遍(.section-title / .panel-title / .section-head),
+   字重、间距容易互不相同 —— 改一次外观得翻十几个文件。
+   ══════════════════════════════════════════════════════════════════════════ */
+.form-section + .form-section {
+  margin-top: 16px;
+}
+
+.form-section__title {
+  margin-bottom: 10px;
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+/* 分节的两个修饰类,都叠在 .form-section 上(节间距和标题样式仍由基类给)。
+   两个类只画「标题 + 一条细线」,不画整圈框 —— 叠上表格自己的外框和单元格竖线后,画满圈框会让
+   一块内容套三层线;分区靠留白和字重,一块内容最多一条线。放在全局是因为这段
+   border/border-radius/padding 会被九个页面的 scoped <style> 各自实现一遍。 */
+.form-section--fieldset,
+.form-section--panel {
+  min-width: 0; /* fieldset 默认 min-inline-size: min-content,不清零会被内容撑破 */
+  border: none;
+  padding: 0;
+}
+
+/* margin 只清左右:fieldset 自带 margin-inline: 2px,写成 margin: 0 会把基类的节间距一起抹掉。 */
+.form-section--fieldset {
+  margin-inline: 0;
+}
+
+/* legend 拉成整行才能画满宽的分割线(默认是收缩到文字宽度的行内块)。 */
+.form-section--fieldset > legend {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+/* 面板标题(或标题 + 按钮那一行)下的细线,不画整圈框。
+   高度写死(不是 min-height):有按钮和没按钮的标题行必须一样高,并排两栏的分割线才落在
+   同一条水平线上 —— 用 min-height 时,按钮那侧只要多出 1px 两边就错开。
+   --panel-head-h 可按页覆盖,但同一屏里的面板要用同一个值。 */
+.form-section--panel > .form-section__title,
+.form-section--panel > .head {
+  display: flex;
+  box-sizing: content-box;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--panel-head-h, 30px);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   满屏列表页:整页正好吃满一屏,滚动只发生在表体里(配表格的 flex-height + virtual-scroll)。
+
+   为什么这套链放全局:「SmartTable 根 → 卡片 → 卡片内容 → n-data-table」如果在每个页面的
+   scoped 里各自实现一遍,:deep 层级容易抄错 —— 比如把类名写成 .n-card__content,而 naive 2.45
+   渲染的是 .n-card-content(前者只存在于 __content-scrollbar),链一断,页面就没有真正铺满。
+   链只写一处,错了也只错一处。
+
+   路由外层 .page-view 是自动高度,页面写 height:100% 会退化成 auto —— 下面 ① 用 :has()
+   把一屏高度补给它,页面就不必再各自写「量 .page 可用高度 + ResizeObserver」那段 JS。
+
+   五种页面形状,按需选一种:
+   1) 模板顶层直接就是 <SmartTable>(list 页最常见的形状):什么都不用加,自动满屏;
+   2) 顶层是自己的外壳 div:给它加 .fill-page;主表若不是直接子元素,给「包住主表的那一层」加 .fill-main;
+   3) 「左分组栏 + 右列表」:给外壳加 .side-page(侧栏宽度按页覆盖 --side-filter-width);
+   4) 页签页:给 <n-tabs> 加 .fill-tabs,面板里的表就接上链了;
+   5) 上下(或左右)分栏、两块各吃一半:容器加 .fill-split,每栏加 .fill-main。
+   链中间夹了 <n-spin> 时给它加 .fill-pass 透传;矮屏宁可让页面滚也别把表压扁时,
+   外壳再叠一个 .fill-page--soft。
+   裸 n-data-table(不经 SmartTable)放在卡片里时,卡片加 .fill-card 接同一条链。
+
+   .fill-main 千万别直接写在 <SmartTable> 上:SmartTable 是 inheritAttrs:false,根节点 class 写死
+   "smart-table",外面传的 class 走 $attrs 被 mergeProps 打到内层 n-data-table 上,根本到不了根节点
+   —— flex-height / virtual-scroll 能透传给表,靠的正是同一条通道。要标就标在包住它的那层元素上。
+
+   表格侧记得配 flex-height + virtual-scroll:没有 flex-height 就没有基准高度,
+   虚拟滚动也就没有滚动容器 —— 两者必须成对出现,单给 virtual-scroll 会把表体压塌。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ① 把一屏高度补给路由外层。
+      不在这里写 overflow:hidden —— 万一某页的内容真的压不下去,让 .page 正常出滚动条,
+      比无声裁掉一截好。 */
+.page-view:has(> .smart-table),
+.page-view:has(> .fill-page),
+.page-view:has(> .side-page) {
+  height: 100%;
+}
+
+/* ② 形状 1:顶层裸 SmartTable。这里不把 .page-view 做成 flex 容器 —— 它同级还挂着
+      FormContainer / 各种弹窗组件,收起时是空节点,变成 flex item 只会平白多出坑。 */
+.page-view > .smart-table {
+  height: 100%;
+  min-height: 0;
+}
+
+/* ③ 形状 2:自定义外壳 */
+.fill-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 搜索卡、统计条、页签头…按内容高度,不参与瓜分剩余高度。
+   放在「谁吃掉剩余高度」之前:同特异度靠源码顺序决胜,主表那条要能盖住它。 */
+.fill-page > * {
+  flex-shrink: 0;
+}
+
+/* ④ 形状 3:「左分组栏 + 右列表」,侧栏定宽,SmartTable 吃满剩余宽高 */
+.side-page {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+}
+
+.side-page > .smart-table {
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ⑤ 谁吃掉剩余高度:外壳的直接子 SmartTable,以及显式标了 .fill-main 的块。 */
+.fill-page > .smart-table,
+.fill-main,
+:is(.fill-main, .fill-split, .fill-tabs .n-tab-pane, .fill-pass > .n-spin-content) > .smart-table {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* .fill-main 自己也得是 flex 列,否则里面的表没有可 flex 的爹 */
+.fill-main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ⑥ SmartTable 内部高度链。断任何一层,flex-height 就拿不到基准高度。
+      末端那三层是库自己的结构,恒成立:div.smart-table > NCard.smart-table-card > .n-card-content
+      > [Toolbar] + NDataTable(.smart-table 的 display:flex 由库自带样式给,这里不重复写)。 */
+:is(
+    .page-view,
+    .fill-page,
+    .side-page,
+    .fill-main,
+    .fill-split,
+    .fill-tabs .n-tab-pane,
+    .fill-pass > .n-spin-content
+  )
+  > .smart-table
+  > .smart-table-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+:is(
+    .page-view,
+    .fill-page,
+    .side-page,
+    .fill-main,
+    .fill-split,
+    .fill-tabs .n-tab-pane,
+    .fill-pass > .n-spin-content
+  )
+  > .smart-table
+  > .smart-table-card
+  > :is(.n-card-content, .n-card__content) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+:is(
+    .page-view,
+    .fill-page,
+    .side-page,
+    .fill-main,
+    .fill-split,
+    .fill-tabs .n-tab-pane,
+    .fill-pass > .n-spin-content
+  )
+  > .smart-table
+  > .smart-table-card
+  > :is(.n-card-content, .n-card__content)
+  > .n-data-table {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ⑦ 裸 n-data-table 装在自己的卡片里时(没走 SmartTable):卡片加 .fill-card */
+.fill-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fill-card > :is(.n-card-content, .n-card__content) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fill-card > :is(.n-card-content, .n-card__content) > .n-data-table {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ⑧ 形状 4:页签页。n-tabs 自身和它的面板层默认是 block,高度传不下去 —— 给 <n-tabs> 加
+      .fill-tabs,把 n-tabs → 面板容器 → .n-tab-pane 一路拉成 flex 列。
+      .n-tabs-pane-wrapper 只在 animated 时才渲染,所以带包装层和不带的两条路都要写。
+      面板层保持 naive 默认的 overflow:hidden(别改成 auto):滚动的责任已经下放到每张表自己
+      —— 表用 flex-height,表体 flex-grow:1 后在表内出竖向滚动条,表头钉住、只有行在滚。
+      这一层若也能滚,就变成「整块跟着滚」、表头跑掉。 */
+.fill-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fill-tabs > .n-tabs-nav {
+  flex-shrink: 0;
+}
+
+.fill-tabs > .n-tabs-pane-wrapper,
+.fill-tabs > .n-tabs-pane-wrapper > .n-tab-pane,
+.fill-tabs > .n-tab-pane {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ⑨ 形状 5:分栏均分。用 flex 均分两栏,不必手算 `(pageHeight - GAP) / 2` 再喂给 :max-height ——
+      同一件事交给 flex 算,窗口变化、页签开关、工具栏换行时都不用重新量。
+      容器加 .fill-split,每栏加 .fill-main(直接放 SmartTable 也行)。
+      flex-basis 必须是 0:写 auto 会先按内容分,内容多的那栏就把另一栏挤扁 —— 这正是
+      「均分」和「按内容分」的分水岭。要不等分就在栏上覆盖 flex-grow(style="flex-grow: 2")。 */
+.fill-split {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--fill-split-gap, var(--gap-card, 12px));
+  min-height: 0;
+}
+
+.fill-split--row {
+  flex-direction: row;
+}
+
+.fill-split > .fill-main,
+.fill-split > .smart-table {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ⑩ 链中间夹了 <n-spin>:它的容器层和内容层默认是 block,高度传不下去。
+      给 <n-spin> 加 class="fill-pass" 即可 —— class 落在 .n-spin-container 上,
+      .n-spin-content 是它的直接子元素,一条规则盖住两层。
+      转圈那层 .n-spin-body 在 container 模式下是 position:absolute,不参与 flex,不受影响。 */
+.fill-pass,
+.fill-pass > .n-spin-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ⑪ 矮屏兜底。整屏定高在 1080p 上很好看,在 768p 上会把表压成一条缝 ——
+      叠一个 .fill-page--soft:高度从「恰好一屏」放宽成「至少一屏」,
+      内容压不下去时让 .page 正常出滚动条,而不是硬裁。
+      配合给表/栏设一个 min-height 使用(如 .fill-split > * { min-height: 220px })。 */
+.fill-page--soft {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}

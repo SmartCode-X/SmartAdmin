@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>SmartAdmin 领域服务层:认证 / RBAC / 组织 / 数据范围 / 字典 / 配置 / 日志 / 上传等业务服务与实体。</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SmartAdmin.SqlSugar\SmartAdmin.SqlSugar.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- WorkerSetup 要绑 SmartAdmin 配置节(独立 Worker 宿主没有 AspNetCore 层可依赖);Microsoft.* 合规 -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <!-- IHostEnvironment:SecurityProfileAccessor / LocalDataProtectionKeyProvider(与 SqlSugar 层同依赖) -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <!-- ICacheProvider 默认实现 MemoryCacheProvider 用 IMemoryCache(Microsoft.* 合规) -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+  </ItemGroup>
+</Project>

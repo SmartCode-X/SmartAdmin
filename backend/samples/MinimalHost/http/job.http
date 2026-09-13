@@ -1,0 +1,120 @@
+### SmartAdmin 示例宿主 —— 定时任务
+# 顺序:先跑「处理器清单」拿到可用的 handlerName,再建任务。种子里已有一个内置任务
+# sys-job-log-cleanup(执行记录清理),它是内置的,删不掉。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 已注册的编译类处理器清单 —— 建任务时 handlerName 从这里选,别手打
+# sqlEnabled 反映 SmartAdmin:Jobs:Sql:Enabled(默认关);关着还选 SQL 载荷就是 47008
+GET {{host}}/api/v1/sys/job/handlers
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### cron 预览 —— 归一化成 6 段 + 算出未来几次触发时刻
+# 用 POST 不是 GET:cron 里有 ? 和 #,走 query 有转义坑
+POST {{host}}/api/v1/sys/job/preview-cron
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "cron": "0 0/5 * * * ?",
+  "count": 5
+}
+
+### 分页查询任务 —— status:1 就绪 / 2 暂停 / 3 完成 / 4 熔断;handlerKind:1 编译 / 2 HTTP / 3 SQL
+GET {{host}}/api/v1/sys/job/page?current=1&size=10
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 新增任务 —— code 创建后不可变(它是排障锚点)
+# triggerKind 1 = cron(填 cronExpression)/ 2 = 固定间隔(填 intervalSeconds,≥5)/ 3 = 一次性(填 oneShotTime)
+# misfireStrategy 1 跳过 / 2 补跑一次;concurrencyMode 1 串行跳过 / 2 并行
+# @name addJob
+POST {{host}}/api/v1/sys/job
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "code": "demo-job",
+  "name": "示例任务",
+  "handlerKind": 1,
+  "handlerName": "SmartAdmin.Services.JobLogCleanupJob",
+  "triggerKind": 1,
+  "cronExpression": "0 0/5 * * * ?",
+  "misfireStrategy": 1,
+  "concurrencyMode": 1,
+  "timeoutSeconds": 60,
+  "retryCount": 0,
+  "failAlertThreshold": 0,
+  "alertByNotice": true,
+  "remark": "http 样例建出来的任务,用完删掉"
+}
+
+### 立刻执行一次 —— 在收到请求的这台副本上跑,不经选主、不打乱调度节奏
+POST {{host}}/api/v1/sys/job/{{addJob.response.body.$.data.id}}/run
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 执行记录 —— jobId 过滤;runStatus:1 运行中 / 2 成功 / 3 失败 / 4 超时 / 5 取消 / 6 跳过
+GET {{host}}/api/v1/sys/job/log/page?jobId={{addJob.response.body.$.data.id}}&current=1&size=10
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 暂停 / 恢复调度 —— true 会重算下次执行时刻
+PUT {{host}}/api/v1/sys/job/{{addJob.response.body.$.data.id}}/enabled?enabled=false
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 更新任务 —— code 传了也不改;触发配置一变就重算下次执行时刻
+PUT {{host}}/api/v1/sys/job/{{addJob.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "code": "demo-job",
+  "name": "示例任务(改成每 10 分钟)",
+  "handlerKind": 1,
+  "handlerName": "SmartAdmin.Services.JobLogCleanupJob",
+  "triggerKind": 1,
+  "cronExpression": "0 0/10 * * * ?",
+  "misfireStrategy": 1,
+  "concurrencyMode": 1,
+  "timeoutSeconds": 60,
+  "retryCount": 1,
+  "retryIntervalSeconds": 30,
+  "failAlertThreshold": 3,
+  "alertByNotice": true,
+  "remark": null
+}
+
+### 监控仪表盘 —— 今日成败 / 在飞 / 状态分布 / 近 14 日趋势 / 即将执行 / 集群节点
+GET {{host}}/api/v1/sys/job/dashboard
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 终止某次执行 —— 跨节点:写终止旗标,目标节点最迟一个轮询周期后停
+# 这里的 id 是执行记录 Id(log/page 返回的),不是任务 Id
+@jobLogId = <粘贴执行记录的 id>
+
+POST {{host}}/api/v1/sys/job/log/{{jobLogId}}/kill
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 清空执行记录(硬删)—— beforeDays 留空 = 全删;运行中的记录一律保留
+POST {{host}}/api/v1/sys/job/log/clear
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "beforeDays": 30,
+  "jobId": {{addJob.response.body.$.data.id}}
+}
+
+### 删除任务(软删,可从回收站恢复;内置任务禁删)
+DELETE {{host}}/api/v1/sys/job/{{addJob.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}

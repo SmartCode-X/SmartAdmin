@@ -1,0 +1,357 @@
+# 主 CI：后端四库矩阵 + 模板冒烟 + 前端（lint/vitest/build）+ 前端 e2e（Playwright，双 webServer）。
+# push / PR 到 main、dev 触发；文档类改动（site/、docs/、*.md）不跑。
+# changes 前置 job 按改动路径决定跑哪一半：只改 web/ 不起后端腿，只改 backend/ 不起前端；schedule、手动触发全跑。
+# 例外是 web-e2e：它同时起前后端，两边任一改动都跑。
+# 每条后端腿只起自己那个数据库容器（sqlite 腿一个都不起），容器在 dotnet build 期间后台拉起。
+# SqlServer 全量套件要 40–60 分钟（每个测试库的 CodeFirst 建表约 20 s，200 个库），
+# 所以 push / PR 只跑方言敏感子集，全量留给定时任务与手动触发。
+name: ci
+
+on:
+  push:
+    branches: [main, dev]
+    paths-ignore: ['site/**', 'docs/**', '**/*.md']
+  pull_request:
+    branches: [main, dev]
+    paths-ignore: ['site/**', 'docs/**', '**/*.md']
+  schedule:
+    - cron: '0 18 * * *'   # 02:00 Asia/Shanghai：SqlServer 全量腿
+  workflow_dispatch:
+    inputs:
+      full-sqlserver:
+        description: '跑 SqlServer 全量套件（默认只跑方言敏感子集）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+env:
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  # 改动路径 → 跑哪一半。基线拿不到（新分支、强推后 before 已不在）或非 push/PR 事件就全跑：宁可多跑，不能漏跑。
+  changes:
+    name: changes (which halves to run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Diff changed paths against the push base / PR base
+        id: filter
+        shell: bash
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request) base="${{ github.event.pull_request.base.sha }}" ;;
+            push)         base="${{ github.event.before }}" ;;
+            *)            base="" ;;
+          esac
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "no usable base commit; running everything"
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$base" "$GITHUB_SHA")
+          printf 'changed files:\n%s\n' "$files"
+          hit() { if printf '%s\n' "$files" | grep -Eq "$1"; then echo true; else echo false; fi; }
+          echo "backend=$(hit '^(backend/|templates/|\.github/workflows/ci\.yml$)')" >> "$GITHUB_OUTPUT"
+          echo "web=$(hit '^(web/|\.github/workflows/ci\.yml$)')" >> "$GITHUB_OUTPUT"
+
+  backend:
+    name: backend (${{ matrix.db }})
+    needs: changes
+    runs-on: ubuntu-latest
+    # 定时任务只为跑 SqlServer 全量。可见性判断按运行时取：仓库转私有时定时腿自动停
+    # （私有仓的 Actions 分钟计费，一晚一次 40–60 分钟的全量吃不消），不用回头改工作流。
+    # 其余事件听 changes 的：后端没改就不起；手动触发全跑。
+    # SqlServer 腿最慢（子集也要 10–14 分钟），但它是多数消费者的生产方言，dev 上每次 push 都跑，换的是合 main 之前的即时反馈。
+    if: >-
+      (github.event_name == 'schedule' && !github.event.repository.private)
+      || (github.event_name != 'schedule' && (needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'))
+    timeout-minutes: ${{ matrix.db == 'sqlserver' && 150 || 40 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, mysql, sqlserver, postgres]
+    services:
+      # Redis 契约测试每条腿都要跑（GITHUB_ACTIONS 下缺连接串直接判红，静默跳过 = 假绿）；alpine 镜像几秒就好
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      SMART_TEST_REDIS: localhost:6379
+      # 每个测试一个库、一个连接池：空闲连接要尽快归还，否则几百个池把服务端连接数撑爆（Too many connections）
+      SMART_TEST_MYSQL: 'Server=127.0.0.1;Port=3306;User ID=root;Password=root;AllowPublicKeyRetrieval=true;SSL Mode=None;ConnectionIdleTimeout=15;'
+      SMART_TEST_SQLSERVER: 'Server=127.0.0.1,1433;User ID=sa;Password=Smart_Test_Pa55w0rd!;TrustServerCertificate=True;Encrypt=False;'
+      SMART_TEST_POSTGRESQL: 'Server=127.0.0.1;Port=5432;User ID=postgres;Password=postgres;Connection Idle Lifetime=15;'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68   # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      # 缓存全局包目录。setup-dotnet 自带的 cache 要 packages.lock.json，本仓没开锁文件，用不了。
+      # 键跟着中央版本清单与各工程走：动了版本就换键；没动就直接命中，四条腿都省掉一次全量 restore。
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/Directory.Packages.props', 'backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      # 只起本腿的数据库，后台拉起让它和 dotnet build 并行：每条腿都起四个库的话，sqlite 腿要白等 70 多秒，
+      # SQL Server 容器还占 2GB 多内存拖慢同机的测试。MySQL 默认 max_connections=151 不够几百个测试库的连接池，直接用启动参数调到 2000。
+      - name: Start ${{ matrix.db }} in the background
+        if: matrix.db != 'sqlite'
+        shell: bash
+        run: |
+          case "${{ matrix.db }}" in
+            mysql)
+              docker run -d --name db -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root \
+                --health-cmd "mysqladmin ping -h 127.0.0.1 -proot" --health-interval 5s --health-timeout 5s --health-retries 30 \
+                mysql:8.0 --max-connections=2000 ;;
+            sqlserver)
+              docker run -d --name db -p 1433:1433 -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e 'MSSQL_SA_PASSWORD=Smart_Test_Pa55w0rd!' \
+                --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Smart_Test_Pa55w0rd!' -Q 'SELECT 1' -b" \
+                --health-interval 10s --health-timeout 10s --health-retries 30 --health-start-period 30s \
+                mcr.microsoft.com/mssql/server:2022-latest ;;
+            postgres)
+              docker run -d --name db -p 5432:5432 -e POSTGRES_PASSWORD=postgres \
+                --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 30 \
+                postgres:16 ;;
+          esac
+      - name: Build
+        run: dotnet build backend/SmartAdmin.slnx -c Release -warnaserror   # 零警告基线：可空引用、XML 注释断链等编译警告直接红
+      - name: Wait for ${{ matrix.db }} to be healthy
+        if: matrix.db != 'sqlite'
+        shell: bash
+        run: |
+          for i in $(seq 1 60); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' db 2>/dev/null || echo missing)
+            if [ "$status" = healthy ]; then echo "healthy after ~$((i * 5))s"; exit 0; fi
+            sleep 5
+          done
+          echo "::error::${{ matrix.db }} container did not become healthy"
+          docker logs db 2>&1 | tail -50
+          exit 1
+      # SqlServer 专属:测试库都是从 model 复制出来的,所以把 model 调成「用完即弃」该有的样子。
+      # 每个测试库的开销按实测是 23 条 CREATE TABLE/INDEX 各自 auto-commit 一次日志刷盘 ×~200 个库;
+      # 延迟持久化正对着这一条(提交不再等日志落盘),完整恢复模式对活不过一次 CI 的库也毫无意义。
+      # 崩了丢事务在这里无所谓——库的寿命就是这一次 run。
+      - name: Make throwaway databases cheap (sqlserver)
+        if: matrix.db == 'sqlserver'
+        shell: bash
+        run: |
+          docker exec db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Smart_Test_Pa55w0rd!' -b \
+            -Q "ALTER DATABASE [model] SET RECOVERY SIMPLE; ALTER DATABASE [model] SET DELAYED_DURABILITY = FORCED;"
+          docker exec db /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Smart_Test_Pa55w0rd!' -b \
+            -Q "SELECT name, recovery_model_desc, delayed_durability_desc FROM sys.databases WHERE name = 'model';"
+      - name: Pick dialect and test scope
+        id: scope
+        shell: bash
+        run: |
+          case "${{ matrix.db }}" in
+            mysql)     echo "dbtype=MySql"      >> "$GITHUB_OUTPUT" ;;
+            sqlserver) echo "dbtype=SqlServer"  >> "$GITHUB_OUTPUT" ;;
+            postgres)  echo "dbtype=PostgreSQL" >> "$GITHUB_OUTPUT" ;;
+            *)         echo "dbtype="           >> "$GITHUB_OUTPUT" ;;
+          esac
+          # 方言敏感子集：nvarchar 中文、布尔谓词全局过滤器、T-SQL DDL / 首启建表、Storageable 种子 SQL、领取 CAS、多 ConfigId。
+          # 与库无关的逻辑其余三条腿已经全量覆盖。
+          if [ "${{ matrix.db }}" = "sqlserver" ] && [ "${{ github.event_name }}" != "schedule" ] && [ "${{ inputs.full-sqlserver }}" != "true" ]; then
+            echo 'filter=--filter-class "*CodeFirstNullableUpgradeTests*" --filter-class "*ProductionBootstrapTests*" --filter-class "*SeedUpgradeTests*" --filter-class "*SeedIdRangeTests*" --filter-class "*DataScopeTests*" --filter-class "*SoftDeleteAuditTests*" --filter-class "*DictCrudTests*" --filter-class "*UserCrudTests*" --filter-class "*JobClaimTests*" --filter-class "*MultiConfigIdTests*"' >> "$GITHUB_OUTPUT"
+          else
+            echo 'filter=' >> "$GITHUB_OUTPUT"
+          fi
+      # runner 只有 2 核，xUnit 默认并行线程数 = 核数；这批测试是在等数据库往返，不是吃 CPU，放到 8 个并行。
+      # 只在这里给（MTP 模式下是测试程序自己的命令行参数,走 `--` 之后）,本机仍按核数走。
+      - name: Test
+        env:
+          SMART_TEST_DBTYPE: ${{ steps.scope.outputs.dbtype }}
+        run: dotnet test backend/SmartAdmin.slnx -c Release --no-build -- --report-xunit-trx --report-xunit-trx-filename results.trx --results-directory TestResults --max-threads 8 ${{ steps.scope.outputs.filter }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
+        if: always()
+        with:
+          name: test-results-${{ matrix.db }}
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 7
+
+  template-smoke:
+    name: template-smoke (dotnet new smart-app)
+    needs: changes
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' && (needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68   # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      # pack 内核 → 本地 feed → pack 模板 → dotnet new smart-app → build：消费者拿到包后的第一条命令
+      - name: Smoke
+        run: pwsh templates/smoke-test.ps1
+
+  web:
+    name: web (lint + vitest + build)
+    needs: changes
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' && (needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check   # prettier 只查不改；定义了却没人跑的检查等于没有
+      - run: npm test
+      - run: npm run build   # 含 vue-tsc --noEmit
+
+  web-e2e:
+    name: web-e2e (playwright)
+    needs: changes
+    runs-on: ubuntu-latest
+    # e2e 起的是双 webServer：MinimalHost（后端）+ Vite（前端），所以两边任一改动都要跑。
+    if: >-
+      github.event_name != 'schedule'
+      && (needs.changes.outputs.web == 'true' || needs.changes.outputs.backend == 'true'
+          || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # CI 下 playwright.config.ts 拒绝自己找端口（并行 run 抢端口，症状会伪装成「后端起不来」），
+      # 必须显式注入，且两个值不能相同。
+      SMART_E2E_API_PORT: 21100
+      SMART_E2E_WEB_PORT: 32100
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68   # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('backend/Directory.Packages.props', 'backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # 只装 chromium：配置里没有 projects，默认就跑它，装全套白花两分钟。
+      - run: npx playwright install --with-deps chromium
+      # 后端那个 webServer 的就绪窗口是 120 秒，而它跑的是 dotnet run（自带 restore + build）。
+      # 先把还原做掉，把网络时间挪出那扇窗口，免得冷 runner 上超时报成「后端起不来」。
+      - name: Warm the NuGet restore for MinimalHost
+        working-directory: .
+        run: dotnet restore backend/samples/MinimalHost
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ── 安全扫描 ──────────────────────────────────────────────────────────────────
+  # CodeQL 与 dependency-review 对公开仓免费，转私有则要 GitHub Advanced Security，
+  # 没有就一直报权限错。所以按仓库可见性门控，可见性变了自动跟着变，不用回头改工作流。
+  # 兜底的 deps-audit 不依赖 GHAS，常开——上面两个停掉时，它是唯一还在看依赖漏洞的东西。
+  codeql:
+    name: codeql (${{ matrix.language }})
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [csharp, javascript-typescript]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938   # v4.37.9
+        with:
+          languages: ${{ matrix.language }}
+          # 无构建模式：C# 也不必先编译一遍全解决方案，省掉与 backend 腿重复的十几分钟。
+          build-mode: none
+      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938   # v4.37.9
+        with:
+          category: /language:${{ matrix.language }}
+
+  dependency-review:
+    name: dependency-review (PR only)
+    if: ${{ github.event_name == 'pull_request' && !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294   # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  deps-audit:
+    name: deps-audit (nuget + npm)
+    # 常开:CodeQL 与 dependency-review 停掉时,它是唯一还在看依赖漏洞的东西。
+    # 只在私有仓的定时触发上让路——那条 cron 本来就是给 SqlServer 全量腿的,私有期不跑。
+    if: github.event_name != 'schedule' || !github.event.repository.private
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68   # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        with:
+          node-version: 22
+      # `dotnet list package --vulnerable` 找到漏洞照样退出 0，只在正文里写一行。
+      # 不判这行就是个永远绿的检查——比没有更糟，因为它让人以为查过了。
+      - name: NuGet advisories
+        run: |
+          dotnet restore backend/SmartAdmin.slnx
+          dotnet list backend/SmartAdmin.slnx package --vulnerable --include-transitive | tee /tmp/nuget-audit.txt
+          if grep -q 'has the following vulnerable packages' /tmp/nuget-audit.txt; then
+            echo "::error::NuGet 依赖存在已知漏洞，见上方清单"
+            exit 1
+          fi
+      # --omit=dev:只审会发出去的那部分。构建工具链上的公告(openapi-typescript 拉的
+      # js-yaml、vite 拉的 postcss……)拦下来的是发版,而攻击面要求你先拿一份恶意的
+      # OpenAPI 文档去喂自己的代码生成器——那不是用户面临的风险。
+      # 进浏览器的依赖仍然硬拦:那才是别人真正跑着的东西。
+      - name: npm advisories (web)
+        working-directory: web
+        run: npm audit --omit=dev --audit-level=high
+      # 文档站没有运行时依赖,这一条基本恒绿;留着是为了将来真往里加什么时它能说话。
+      - name: npm advisories (site)
+        working-directory: site
+        run: npm audit --omit=dev --audit-level=high

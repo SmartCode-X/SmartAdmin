@@ -1,0 +1,100 @@
+### SmartAdmin 示例宿主 —— 运维(在线会话 / 缓存 / 服务器监控 / 回收站 / 发通知)
+# 这一组是管理端动作,全部 [RolePermission] + 留操作日志。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 在线会话分页 —— userId 可选,按用户过滤
+GET {{host}}/api/v1/sys/session/online?current=1&size=20
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 强制下线 —— 该会话的访问令牌下次请求即 401,不用等自然过期
+# sessionId 从上一条挑一个粘过来。别踢自己那条,否则本文件后面的请求全 401
+@sessionId = <粘贴 online 返回里的 sessionId>
+
+DELETE {{host}}/api/v1/sys/session/{{sessionId}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 清授权缓存 —— 全部用户的权限码 + 数据范围,返回被清的用户数
+# 直接改库(绕过接口)调整了角色授权时用得上
+POST {{host}}/api/v1/sys/cache/flush-auth
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 清字典缓存 —— 返回被清的字典类型数
+POST {{host}}/api/v1/sys/cache/flush-dict
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 清配置缓存 —— 返回被清的配置项数
+POST {{host}}/api/v1/sys/cache/flush-config
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 重建门户 —— 递增代际,令所有用户的菜单/模块缓存整体失效,返回新代际值
+POST {{host}}/api/v1/sys/cache/rebuild-portal
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 服务器运行快照 —— CPU/内存/磁盘/运行时;里面含一次约 500ms 的 CPU 采样,慢是正常的
+GET {{host}}/api/v1/sys/monitor/server
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 回收站:列已删记录
+# type 是登记项,内核九种:user role job org position module config dict menu
+# (消费者用 AddRecycleBinType<T>() 把自己的软删表也接进来,路由自动可用)
+GET {{host}}/api/v1/sys/recycle/user/page?current=1&size=10
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 回收站:恢复 —— Id 从上一条挑
+@recycleId = <粘贴回收站列表里的 id>
+
+POST {{host}}/api/v1/sys/recycle/user/{{recycleId}}/restore
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 回收站:彻底删除 —— 物理删,不可恢复
+DELETE {{host}}/api/v1/sys/recycle/user/{{recycleId}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 发布通知 —— type:1 通知 / 2 公告 / 3 消息;receiverType:0 全体 / 1 指定角色 / 2 指定用户
+# receiverType = 0 时 receiverIds 会被忽略
+POST {{host}}/api/v1/sys/notice
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "示例公告",
+  "content": "这条是 http 样例发的,收到就说明消息中心通了。",
+  "type": 2,
+  "receiverType": 0
+}
+
+### 发给指定角色 —— receiverIds 填角色 Id(1 = 种子里的系统管理员)
+POST {{host}}/api/v1/sys/notice
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "title": "只发给系统管理员",
+  "content": "定向通知示例。",
+  "type": 1,
+  "receiverType": 1,
+  "receiverIds": [1]
+}
+
+### 通知列表(管理端全量)
+GET {{host}}/api/v1/sys/notice/page?current=1&size=10
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 删除通知 —— Id 从上一条挑
+@noticeId = <粘贴通知列表里的 id>
+
+DELETE {{host}}/api/v1/sys/notice/{{noticeId}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}

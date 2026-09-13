@@ -1,0 +1,71 @@
+using System.Reflection;
+
+namespace SmartAdmin.Core;
+
+/// <summary>SmartAdmin 顶层配置(对应 appsettings 的 SmartAdmin 节 + 代码侧开关)</summary>
+public class SmartAdminOptions
+{
+    /// <summary>数据库配置(类型/连接串,见 <see cref="AdminDatabaseOptions"/>)</summary>
+    public AdminDatabaseOptions Database { get; set; } = new();
+
+    /// <summary>
+    /// 副库连接列表(多 ConfigId;见 <see cref="AdminDatabaseConnectionOptions"/>)。
+    /// <para>空列表 = 单库。主库仍由 <see cref="Database"/> 提供,ConfigId 固定为 <c>SmartAdmin</c>。
+    /// 访问副库请用 SqlSugar 原生多库 API(如 <c>GetConnection(configId)</c>);
+    /// <c>IRepository&lt;T&gt;</c> 始终打主库。副库实体勿登记进 <see cref="ApplicationAssemblies"/>。</para>
+    /// </summary>
+    public List<AdminDatabaseConnectionOptions> AdditionalDatabases { get; set; } = new();
+
+    /// <summary>缓存配置(提供者/前缀/权限缓存过期,见 <see cref="AdminCacheOptions"/>)</summary>
+    public AdminCacheOptions Cache { get; set; } = new();
+
+    /// <summary>种子配置(超管账号/初始密码,见 <see cref="AdminSeedOptions"/>)</summary>
+    public AdminSeedOptions Seed { get; set; } = new();
+
+    /// <summary>JWT 配置(密钥/签发者/有效期,见 <see cref="AdminJwtOptions"/>)</summary>
+    public AdminJwtOptions Jwt { get; set; } = new();
+
+    /// <summary>安全配置(会话并发策略等,见 <see cref="AdminSecurityOptions"/>)</summary>
+    public AdminSecurityOptions Security { get; set; } = new();
+
+    /// <summary>上传配置(存储根/大小上限/后缀白名单,见 <see cref="AdminUploadOptions"/>)</summary>
+    public AdminUploadOptions Upload { get; set; } = new();
+
+    /// <summary>导入/导出配置(行数上限/文件大小,见 <see cref="AdminExcelOptions"/>;对应 <c>SmartAdmin:Excel</c>)</summary>
+    public AdminExcelOptions Excel { get; set; } = new();
+
+    /// <summary>邮件通道配置(SMTP 主机/端口/凭据;空主机走日志实现,见 <see cref="AdminEmailOptions"/>)</summary>
+    public AdminEmailOptions Email { get; set; } = new();
+
+    /// <summary>外部登录 / SSO 配置(内置 OIDC provider 列表 + 回调基址;连接与密钥走此,运营开关走 sys_config,见 <see cref="AdminExternalAuthOptions"/>)</summary>
+    public AdminExternalAuthOptions ExternalAuth { get; set; } = new();
+
+    /// <summary>API 配置(禁用模块等,见 <see cref="AdminApiOptions"/>)</summary>
+    public AdminApiOptions Api { get; set; } = new();
+
+    /// <summary>实时通知配置(SignalR 推送开关/Hub 路径;默认关,开启后强退/公告即时推送,见 <see cref="AdminRealtimeOptions"/>)</summary>
+    public AdminRealtimeOptions Realtime { get; set; } = new();
+
+    /// <summary>定时任务配置(本副本调度开关/心跳租约/HTTP 围栏/SQL 闸,见 <see cref="AdminJobsOptions"/>;对应 <c>SmartAdmin:Jobs</c>)</summary>
+    public AdminJobsOptions Jobs { get; set; } = new();
+
+    /// <summary>演示模式:开启后仅允许 GET/HEAD/OPTIONS,其余写请求一律拒绝(41002)</summary>
+    public bool DemoMode { get; set; }
+
+    /// <summary>雪花 ID 配置(机器号,见 <see cref="AdminIdOptions"/>)</summary>
+    public AdminIdOptions Id { get; set; } = new();
+
+    /// <summary>诊断日志配置(文件日志开关/路径/保留期,见 <see cref="AdminLoggingOptions"/>;默认不写盘)</summary>
+    public AdminLoggingOptions Logging { get; set; } = new();
+
+    /// <summary>显式指定要并入的业务程序集(代码侧,不从配置绑定):其实体参与 CodeFirst 建表、控制器 AddApplicationPart 挂载。</summary>
+    public List<Assembly> ApplicationAssemblies { get; set; } = new();
+
+    /// <summary>
+    /// 消费者的错误码枚举(代码侧)。登记后 <c>(ErrorCode)MyCodes.X</c> 抛出的异常,统一信封里的 msgKey
+    /// 取自该成员自己的 <see cref="MsgKeyAttribute"/>,不必再复制一份异常过滤器。
+    /// <para><see cref="ApplicationAssemblies"/> 里带 <c>[MsgKey]</c> 的枚举会被自动扫到,通常无需在此重复列出;
+    /// 错误码定义在别的程序集(未登记为业务程序集)时才需要。</para>
+    /// </summary>
+    public List<Type> ErrorCodeEnums { get; set; } = new();
+}

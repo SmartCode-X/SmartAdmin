@@ -1,0 +1,141 @@
+# SmartAdmin
+
+> A distributable admin-system kernel for ASP.NET Core. Install one NuGet package, call `AddSmartAdmin` and `MapSmartAdmin` in `Program.cs`, and get authentication, RBAC, multi-org data permissions, dictionaries, config, logging and uploads — every service interface-backed, `virtual`, and registered with `TryAdd` so any piece can be swapped without forking.
+
+Repository: https://github.com/SmartCode-X/SmartAdmin
+Runtime dependencies of the core packages: SqlSugarCore plus Microsoft.* only.
+Databases: SQLite, MySQL, SQL Server, PostgreSQL. Frontend: the `smart-admin-web` npm package (Vue 3 + Naive UI), versioned in lockstep with the NuGet packages; the thin app template in `web/template` is the starting point a consumer pulls with degit and owns.
+
+The docs are bilingual. English lives at the root path and is a translation; Simplified Chinese lives under `/zh/` and is the source of truth for wording. Both sides carry the same facts and the same section structure.
+
+## Get started
+
+- [Quick Start](https://smartcode-x.github.io/SmartAdmin/guide/getting-started)
+- [The Frontend Template](https://smartcode-x.github.io/SmartAdmin/guide/frontend-templates)
+- [Core Concepts](https://smartcode-x.github.io/SmartAdmin/guide/concepts)
+- [FAQ](https://smartcode-x.github.io/SmartAdmin/faq)
+
+## Build a business module
+
+- [Add a Business Module (Backend)](https://smartcode-x.github.io/SmartAdmin/guide/business-module)
+- [Add a Frontend Page](https://smartcode-x.github.io/SmartAdmin/guide/frontend-page)
+- [Wire Import/Export on Your Entity](https://smartcode-x.github.io/SmartAdmin/guide/import-export)
+- [Scheduled Jobs](https://smartcode-x.github.io/SmartAdmin/guide/scheduled-jobs)
+
+## Customize the kernel
+
+- [Replace Built-in Services](https://smartcode-x.github.io/SmartAdmin/guide/replace-service)
+- [Configure Multiple Databases (Multi-ConfigId)](https://smartcode-x.github.io/SmartAdmin/guide/multi-database)
+
+## Deploy
+
+- [Deployment: Choose a Route, Then Clear the Security Baseline](https://smartcode-x.github.io/SmartAdmin/guide/deployment/)
+- [Route A: Monolithic Deployment](https://smartcode-x.github.io/SmartAdmin/guide/deployment/route-a)
+- [Route B: Reverse Proxy (nginx or Caddy)](https://smartcode-x.github.io/SmartAdmin/guide/deployment/route-b)
+- [Route C: True Cross-Origin (CDN)](https://smartcode-x.github.io/SmartAdmin/guide/deployment/route-c)
+- [Containers & Multi-Replica](https://smartcode-x.github.io/SmartAdmin/guide/deployment/docker)
+
+## Backend reference
+
+- [Project Structure & Startup](https://smartcode-x.github.io/SmartAdmin/backend/structure)
+- [Layered Architecture and Package Dependencies](https://smartcode-x.github.io/SmartAdmin/backend/architecture)
+- [Request Pipeline](https://smartcode-x.github.io/SmartAdmin/backend/request-pipeline)
+- [Data Layer and Auditing](https://smartcode-x.github.io/SmartAdmin/backend/data-layer)
+- [Multi-Org Data Scope](https://smartcode-x.github.io/SmartAdmin/backend/data-scope)
+- [Error Codes](https://smartcode-x.github.io/SmartAdmin/backend/error-codes)
+- [Authentication and Security](https://smartcode-x.github.io/SmartAdmin/backend/auth-security)
+- [External Login (SSO)](https://smartcode-x.github.io/SmartAdmin/backend/external-login)
+- [Replaceability Model](https://smartcode-x.github.io/SmartAdmin/backend/replaceability)
+- [Event Bus](https://smartcode-x.github.io/SmartAdmin/backend/event-bus)
+- [Realtime Notifications](https://smartcode-x.github.io/SmartAdmin/backend/realtime)
+- [Ops Endpoints](https://smartcode-x.github.io/SmartAdmin/backend/ops)
+- [Tracing and Metrics](https://smartcode-x.github.io/SmartAdmin/backend/observability)
+- [SQL Console Log](https://smartcode-x.github.io/SmartAdmin/backend/sql-log)
+
+## Frontend reference
+
+- [Project Structure & Startup](https://smartcode-x.github.io/SmartAdmin/frontend/structure)
+- [Routing & Dynamic Menus](https://smartcode-x.github.io/SmartAdmin/frontend/routing)
+- [Multi-App Portal & Router Guards](https://smartcode-x.github.io/SmartAdmin/frontend/portal-guards)
+- [Frontend Permissions](https://smartcode-x.github.io/SmartAdmin/frontend/permission)
+- [Adapting to the Backend: Response Contract & Error Codes](https://smartcode-x.github.io/SmartAdmin/frontend/api-contract)
+- [HTTP Request Layer](https://smartcode-x.github.io/SmartAdmin/frontend/request)
+- [Internationalization](https://smartcode-x.github.io/SmartAdmin/frontend/i18n)
+- [Theme & Icons](https://smartcode-x.github.io/SmartAdmin/frontend/appearance)
+
+## Shared components
+
+- [Component Ecosystem](https://smartcode-x.github.io/SmartAdmin/components/)
+- [SmartTable](https://smartcode-x.github.io/SmartAdmin/components/smart-table)
+- [SmartIcon and SmartIconPicker](https://smartcode-x.github.io/SmartAdmin/components/smart-icon)
+
+## Standards
+
+- [Backend Standards (.NET 10 kernel)](https://smartcode-x.github.io/SmartAdmin/standard/backend)
+- [Frontend Standards (Vue 3 + Naive UI)](https://smartcode-x.github.io/SmartAdmin/standard/frontend)
+- [Commit Convention](https://smartcode-x.github.io/SmartAdmin/standard/commit)
+
+## Project
+
+- [Contributing Guide](https://smartcode-x.github.io/SmartAdmin/community/contributing)
+- [Agent Skills and AI-Assisted Development](https://smartcode-x.github.io/SmartAdmin/community/agent-skills)
+- [Upgrading to a New Release](https://smartcode-x.github.io/SmartAdmin/guide/upgrade)
+- [Changelog](https://smartcode-x.github.io/SmartAdmin/changelog)
+- [The replaceable admin kernel for .NET](https://smartcode-x.github.io/SmartAdmin/)
+
+## 简体中文 (Chinese, source language)
+
+- [快速开始](https://smartcode-x.github.io/SmartAdmin/zh/guide/getting-started)
+- [前端模板](https://smartcode-x.github.io/SmartAdmin/zh/guide/frontend-templates)
+- [核心概念](https://smartcode-x.github.io/SmartAdmin/zh/guide/concepts)
+- [常见问题](https://smartcode-x.github.io/SmartAdmin/zh/faq)
+- [加一个业务模块（后端）](https://smartcode-x.github.io/SmartAdmin/zh/guide/business-module)
+- [前端加一个页面](https://smartcode-x.github.io/SmartAdmin/zh/guide/frontend-page)
+- [给自己的实体接导入导出](https://smartcode-x.github.io/SmartAdmin/zh/guide/import-export)
+- [定时任务](https://smartcode-x.github.io/SmartAdmin/zh/guide/scheduled-jobs)
+- [替换内置服务](https://smartcode-x.github.io/SmartAdmin/zh/guide/replace-service)
+- [配置多数据库（多 ConfigId）](https://smartcode-x.github.io/SmartAdmin/zh/guide/multi-database)
+- [升级到新版本](https://smartcode-x.github.io/SmartAdmin/zh/guide/upgrade)
+- [部署：先选路线，再过安全基线](https://smartcode-x.github.io/SmartAdmin/zh/guide/deployment/)
+- [路线 A：单体部署](https://smartcode-x.github.io/SmartAdmin/zh/guide/deployment/route-a)
+- [路线 B：反向代理（nginx 或 Caddy）](https://smartcode-x.github.io/SmartAdmin/zh/guide/deployment/route-b)
+- [路线 C：真跨源（CDN）](https://smartcode-x.github.io/SmartAdmin/zh/guide/deployment/route-c)
+- [容器化与多副本](https://smartcode-x.github.io/SmartAdmin/zh/guide/deployment/docker)
+- [项目结构与启动](https://smartcode-x.github.io/SmartAdmin/zh/backend/structure)
+- [架构分层与包依赖](https://smartcode-x.github.io/SmartAdmin/zh/backend/architecture)
+- [请求管线](https://smartcode-x.github.io/SmartAdmin/zh/backend/request-pipeline)
+- [数据层与审计](https://smartcode-x.github.io/SmartAdmin/zh/backend/data-layer)
+- [多组织数据权限](https://smartcode-x.github.io/SmartAdmin/zh/backend/data-scope)
+- [错误码](https://smartcode-x.github.io/SmartAdmin/zh/backend/error-codes)
+- [认证与安全](https://smartcode-x.github.io/SmartAdmin/zh/backend/auth-security)
+- [外部登录（SSO）](https://smartcode-x.github.io/SmartAdmin/zh/backend/external-login)
+- [可替换性模型](https://smartcode-x.github.io/SmartAdmin/zh/backend/replaceability)
+- [事件总线](https://smartcode-x.github.io/SmartAdmin/zh/backend/event-bus)
+- [实时通知](https://smartcode-x.github.io/SmartAdmin/zh/backend/realtime)
+- [运维端点](https://smartcode-x.github.io/SmartAdmin/zh/backend/ops)
+- [追踪与指标](https://smartcode-x.github.io/SmartAdmin/zh/backend/observability)
+- [SQL 控制台日志](https://smartcode-x.github.io/SmartAdmin/zh/backend/sql-log)
+- [项目结构与启动](https://smartcode-x.github.io/SmartAdmin/zh/frontend/structure)
+- [路由与动态菜单](https://smartcode-x.github.io/SmartAdmin/zh/frontend/routing)
+- [多应用门户与路由守卫](https://smartcode-x.github.io/SmartAdmin/zh/frontend/portal-guards)
+- [前端权限](https://smartcode-x.github.io/SmartAdmin/zh/frontend/permission)
+- [对接后端：响应契约与错误码](https://smartcode-x.github.io/SmartAdmin/zh/frontend/api-contract)
+- [HTTP 请求层](https://smartcode-x.github.io/SmartAdmin/zh/frontend/request)
+- [国际化](https://smartcode-x.github.io/SmartAdmin/zh/frontend/i18n)
+- [主题与图标](https://smartcode-x.github.io/SmartAdmin/zh/frontend/appearance)
+- [组件生态](https://smartcode-x.github.io/SmartAdmin/zh/components/)
+- [SmartTable](https://smartcode-x.github.io/SmartAdmin/zh/components/smart-table)
+- [SmartIcon 与 SmartIconPicker](https://smartcode-x.github.io/SmartAdmin/zh/components/smart-icon)
+- [后端规范（.NET 10 内核）](https://smartcode-x.github.io/SmartAdmin/zh/standard/backend)
+- [前端规范（Vue 3 + Naive UI）](https://smartcode-x.github.io/SmartAdmin/zh/standard/frontend)
+- [提交规范](https://smartcode-x.github.io/SmartAdmin/zh/standard/commit)
+- [贡献指南](https://smartcode-x.github.io/SmartAdmin/zh/community/contributing)
+- [Agent Skills 与 AI 辅助开发](https://smartcode-x.github.io/SmartAdmin/zh/community/agent-skills)
+- [更新日志](https://smartcode-x.github.io/SmartAdmin/zh/changelog)
+- [可替换的企业后台内核](https://smartcode-x.github.io/SmartAdmin/zh/)
+
+## Not on this site
+
+- `docs/rebuild-design.md` in the repository holds the kernel's design rationale. It is deliberately not published, so the pages above never link into it.
+- `CLAUDE.md` in the repository carries the measured CI facts (dialect matrix timings, gating rules) that an agent working in the repo needs.
+- `skills/` in the repository holds the module-scaffolding and writing skills; `site/community/agent-skills` explains how to consume them.

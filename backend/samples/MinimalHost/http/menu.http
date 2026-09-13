@@ -1,0 +1,119 @@
+### SmartAdmin 示例宿主 —— 菜单 / 权限路由 / 应用(模块)
+# 菜单是权限的载体:permission 字段就是规范化路由({METHOD}:/{路由模板}),角色勾中菜单即完成配权,
+# 代码里永远不出现权限字符串。所以「可授权路由清单」那条是这一组里最该先跑的。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 可授权路由清单 —— 菜单表单里 permission 字段的下拉数据源
+# 数据取自运行时真实路由表,消费方自建的控制器也会自动出现在这里。
+# 手敲权限码是最贵的坑:大小写、{id} 占位符、前导斜杠错一个字符就是「明明授权了还是 403」,
+# 而超管测试时一切正常(直接放行),交付给客户的普通账号才炸。
+GET {{host}}/api/v1/sys/menu/routes
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 全量菜单树(管理端:含停用节点与按钮,全字段)
+# role.http 里要用的 menuIds 从这里挑
+GET {{host}}/api/v1/sys/menu/tree
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 新增顶级目录 —— type:1 目录 / 2 页面 / 3 按钮
+# moduleId 只有顶级目录(parentId = 0)才有效,子节点由树上溯根目录解析,不冗余存
+# @name addCatalog
+POST {{host}}/api/v1/sys/menu/add
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "parentId": 0,
+  "type": 1,
+  "title": "示例目录",
+  "permission": "",
+  "sort": 99,
+  "enabled": true,
+  "moduleId": 1,
+  "path": "/demo",
+  "icon": "lucide:flask-conical",
+  "visible": true
+}
+
+### 在目录下加一个页面 —— permission 填从 /menu/routes 里挑出来的路由码
+POST {{host}}/api/v1/sys/menu/add
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "parentId": {{addCatalog.response.body.$.data.id}},
+  "type": 2,
+  "title": "示例页面",
+  "permission": "GET:/api/v1/ping",
+  "sort": 1,
+  "enabled": true,
+  "path": "/demo/ping",
+  "component": "demo/ping/index",
+  "visible": true
+}
+
+### 更新菜单
+PUT {{host}}/api/v1/sys/menu/{{addCatalog.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "parentId": 0,
+  "type": 1,
+  "title": "示例目录(已改名)",
+  "permission": "",
+  "sort": 98,
+  "enabled": true,
+  "moduleId": 1,
+  "path": "/demo",
+  "icon": "lucide:flask-conical",
+  "visible": true
+}
+
+### 删除菜单 —— 还挂着子节点会被拒
+# 所以要先删上面那个「示例页面」,再删这个目录
+DELETE {{host}}/api/v1/sys/menu/{{addCatalog.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 应用(模块)列表 —— 种子播了 1 系统 / 2 业务中心
+GET {{host}}/api/v1/sys/module/list
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 新增应用
+# apiPrefix 是后端路由匹配前缀,用于权限路由下拉按应用软过滤;留空 = 不过滤
+# @name addModule
+POST {{host}}/api/v1/sys/module/add
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "code": "demo",
+  "title": "示例应用",
+  "icon": "lucide:box",
+  "defaultRoute": "",
+  "apiPrefix": "demo",
+  "sort": 9,
+  "enabled": true,
+  "remark": "http 样例建出来的应用"
+}
+
+### 应用详情
+GET {{host}}/api/v1/sys/module/{{addModule.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 删除应用 —— 内置 system 受保护删不掉
+DELETE {{host}}/api/v1/sys/module/{{addModule.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}

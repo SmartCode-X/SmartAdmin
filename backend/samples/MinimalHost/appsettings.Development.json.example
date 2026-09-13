@@ -1,0 +1,60 @@
+{
+  "SmartAdmin": {
+    "//Database": "开发期想看 ORM 生成了什么、每条跑多久,把下面这段的注释去掉(键名去掉前导下划线)。生产别开:每请求若干条语句。",
+    "_Database": {
+      "SqlLog": {
+        "Enabled": true,
+        "MinMillis": 0,
+        "RequestSummary": true
+      }
+    },
+
+    "Seed": {
+      "AdminAccount": "superAdmin",
+      "AdminPassword": ""
+    },
+
+    "//ExternalAuth": "外部登录 / SSO(批次 D)。连接与密钥走这里(不进库);运营开关(启用/未绑定策略/开户默认角色·机构)走 sys_config 键 sys.externalauth.{code}.*。下方 _* 键仅为形态示例,binder 忽略;把要用的搬进 Oidc/WeCom/DingTalk 并填真实值即启用。",
+    "ExternalAuth": {
+      "CallbackBaseUrl": "https://admin.example.com",
+      "FrontendResultPath": "/oauth/callback",
+      "_FrontendResultPathDevNote": "前后端分离开发请写完整前端 URL,如 http://localhost:5173/oauth/callback;相对路径会 302 到后端主机。",
+
+      "Oidc": [],
+      "_OidcExample": {
+        "Code": "keycloak",
+        "DisplayName": "Keycloak SSO",
+        "Icon": "ph:key-duotone",
+        "Authority": "https://keycloak.example.com/realms/master",
+        "ClientId": "smart-admin",
+        "ClientSecret": "<client-secret>",
+        "Scopes": "openid profile email",
+        "UsePkce": true
+      },
+
+      "WeCom": {
+        "_note": "企业微信扫码登录;填 CorpId + CorpSecret 即启用(空则不点亮按钮)",
+        "CorpId": "",
+        "AgentId": "",
+        "CorpSecret": ""
+      },
+      "DingTalk": {
+        "_note": "钉钉扫码登录;填 AppKey + AppSecret 即启用(空则不点亮按钮)",
+        "AppKey": "",
+        "AppSecret": ""
+      },
+      "GitHub": {
+        "_note": "GitHub OAuth App;填 ClientId+ClientSecret 即启用。登录页显示开关:sys.externalauth.github.enabled。未绑定默认拒绝;演示 JIT 请在配置中心设 sys.externalauth.github.provisioning=provision(不是本文件)。",
+        "ClientId": "",
+        "ClientSecret": "",
+        "DisplayName": "GitHub"
+      },
+      "WeChat": {
+        "_note": "个人微信开放平台网站应用扫码;填 AppId+AppSecret 即启用。Subject 仅 unionid(应用须挂开放平台账号)。与企业微信(WeCom)不同。",
+        "AppId": "",
+        "AppSecret": "",
+        "DisplayName": "微信"
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+### SmartAdmin 示例宿主 —— 认证
+# 顺序:先跑「登录」,后面几条从它的响应里取令牌。
+# 每个文件都自带一条登录,不是复制粘贴偷懒:.http 的请求变量(从命名请求的响应里取值)作用域只到本文件,
+# 跨文件取不到(VS Code REST Client 与 VS 2022 都是这个规矩),详见 README。
+
+@host = http://localhost:5100
+@account = superAdmin
+# 首次启动建超管时,控制台会把随机密码醒目打印一次(只有那一次)。想要固定值,就在
+# appsettings.Development.json 里设 SmartAdmin:Seed:AdminPassword,然后删掉 data/ 下的库文件重启。
+@password = <粘贴首启控制台打印的随机密码>
+
+### 图形验证码(SVG)
+# 默认关(SmartAdmin:Security:Captcha:Enabled = false)。开了之后,下面登录体里要补
+# captchaId(本条返回的)+ captchaCode(人眼识别出来的)两个字段。
+GET {{host}}/api/v1/auth/captcha
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 认证连通性探针 —— 带令牌就回当前账号
+# 整条鉴权管道(JWT 解析 → 权限码 → 会话活性)最便宜的冒烟点
+GET {{host}}/api/v1/ping
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 刷新令牌 —— 换一对新令牌
+# 轮换语义:旧刷新令牌立即作废,再拿它换一次会被判为泄露并吊销整条会话。
+# 跑完这条,上面 login 的 accessToken 仍然有效到自然过期,后续请求继续引用 login 那条即可。
+POST {{host}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.$.data.refreshToken}}"
+}
+
+### 登出 —— 吊销当前会话
+# 之后拿同一个 accessToken 再打 /ping 会 401:强退是即时的,不等令牌自然过期。
+# 放在文件最后,因为跑了它就得重新跑一次登录。
+POST {{host}}/api/v1/auth/logout
+Authorization: Bearer {{login.response.body.$.data.accessToken}}

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>SmartAdmin 宿主接入层:AddSmartAdmin / MapSmartAdmin 一键装配、JWT 认证、[RolePermission] 授权、内置控制器与过滤器。</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SmartAdmin.Services\SmartAdmin.Services.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- JWT 认证:用微软官方件(运行时依赖只准 SqlSugarCore + Microsoft.*) -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <!-- 内置 OpenAPI 文档生成:/openapi/v1.json 是前端 API 类型(gen:api)的契约源 -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <!-- 直接引用抬到修补版,压过 AspNetCore.OpenApi 传递来的 2.0.0(消 NU1903 高危) -->
+    <PackageReference Include="Microsoft.OpenApi" />
+  </ItemGroup>
+</Project>

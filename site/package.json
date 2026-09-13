@@ -1,0 +1,25 @@
+{
+  "name": "smartadmin-docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SmartAdmin 文档门面站(VitePress)",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev",
+    "docs:build": "vitepress build",
+    "docs:preview": "vitepress preview",
+    "lint:prose": "node scripts/lint-prose.mjs",
+    "lint:prose:selftest": "node scripts/lint-prose.mjs --selftest",
+    "check:llms": "node scripts/check-llms.mjs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  },
+  "overrides": {
+    "vite": "^6.4.3",
+    "esbuild": "^0.25.0"
+  }
+}

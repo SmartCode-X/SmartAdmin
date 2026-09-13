@@ -1,0 +1,25 @@
+using SmartAdmin.Core;
+using SmartAdmin.SqlSugar;
+
+namespace SmartAdmin.Services;
+
+/// <summary>
+/// 测试用户种子——每种数据范围各一个用户,密码统一 123456。
+/// 不设 SuperAdminSeed 的"表已有行就跳过"守卫:密码固定,靠 Storageable 幂等即可。
+/// </summary>
+public class DefaultUserSeed(IPasswordHasher hasher) : ISeedData<SysUser>
+{
+    /// <inheritdoc />
+    public virtual IEnumerable<SysUser> HasData()
+    {
+        var pwd = hasher.Hash("123456");
+        return
+        [
+            new SysUser { Id = 2, Account = "全部数据",   Name = "全部数据",   Password = pwd, OrgId = 1, Enabled = true },
+            new SysUser { Id = 3, Account = "本机构数据",  Name = "本机构数据",  Password = pwd, OrgId = 3, Enabled = true },
+            new SysUser { Id = 4, Account = "本机构及以下", Name = "本机构及以下", Password = pwd, OrgId = 3, Enabled = true },
+            new SysUser { Id = 5, Account = "仅本人数据",  Name = "仅本人数据",  Password = pwd, OrgId = 4, Enabled = true },
+            new SysUser { Id = 6, Account = "自定义范围",  Name = "自定义范围",  Password = pwd, OrgId = 1, Enabled = true },
+        ];
+    }
+}

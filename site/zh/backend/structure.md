@@ -1,0 +1,104 @@
+# 项目结构与启动
+
+`SmartAdmin.TestHost` 名字像测试项目，却一个断言都没有：它的活是演一个消费方。注册进 `options.ApplicationAssemblies` 后，它的实体、种子、控制器全走一遍外部工程的挂载路径。`src/` 之外的项目连示例宿主都是这个路数，读的不是测试，是别人怎么用这套内核。
+
+至于依赖方向、可替换性、请求管道这些设计上的「为什么」，都放在[架构](/zh/backend/architecture)一页展开。
+
+## 解决方案结构
+
+`backend/SmartAdmin.slnx` 把所有项目分成三个解决方案文件夹：
+
+| 文件夹 | 内容 |
+| --- | --- |
+| `samples/` | `MinimalHost`：零配置示例宿主，用于本地开发与手工验证；`WorkerHost`：把定时任务调度独立跑成一个进程的示例宿主 |
+| `src/` | 十二个正式发版的包 |
+| `tests/` | `SmartAdmin.Tests`（测试套件）与 `SmartAdmin.TestHost`（一个最小化的消费方宿主） |
+
+`src/` 下的包在[架构](/zh/backend/architecture)页有详细展开，这里只做定位：
+
+| 包 | 一句话定位 |
+| --- | --- |
+| `SmartAdmin.Core` | 核心契约，零运行时依赖：`Result<T>`、`ErrorCode`、雪花 ID、安全与扩展点接口 |
+| `SmartAdmin.SqlSugar` | 数据层：单一 SqlSugar 实例、CodeFirst 建表、幂等种子、审计/软删/数据范围全局过滤器、开放泛型仓储 |
+| `SmartAdmin.Services` | 领域服务：认证 / RBAC / 机构 / 数据范围 / 字典 / 配置 / 日志 / 上传等业务服务与实体 |
+| `SmartAdmin.AspNetCore` | 宿主集成：一键装配的 `AddSmartAdmin`/`MapSmartAdmin`、JWT 认证、`[RolePermission]` 授权、内置控制器与过滤器 |
+| `SmartAdmin` | 元包：装这一个即拉起整条内核（AspNetCore + Services + SqlSugar + Core） |
+| `SmartAdmin.Caching.Redis` | 可选包：基于 `StackExchange.Redis` 的 `ICacheProvider` 实现，在 `AddSmartAdmin()` 之前调用即启用 |
+| `SmartAdmin.Auth.WeCom` | 可选包：企业微信登录（桌面扫码、客户端内网页授权）的 `IExternalAuthProvider` 实现 |
+| `SmartAdmin.Auth.DingTalk` | 可选包：钉钉扫码登录的 `IExternalAuthProvider` 实现 |
+| `SmartAdmin.Auth.GitHub` | 可选包：GitHub OAuth App 登录的 `IExternalAuthProvider` 实现 |
+| `SmartAdmin.Auth.WeChat` | 可选包：微信开放平台网站应用扫码登录的 `IExternalAuthProvider` 实现 |
+| `SmartAdmin.Excel` | 可选包：xlsx 读写与带下拉的模板生成，在 `AddSmartAdmin()` 之前调用即启用，不装则相关接口返回 `46001` |
+| `SmartAdmin.Testing` | 测试支撑包：`AdminAppFactory<TEntryPoint>`（一次性库 + 固定超管密码与 JWT 密钥）、四方言 `TestDb`（按 `SMART_TEST_DBTYPE` 切换，模板库克隆加速）、`PostJson` / `ReadEnvelope` / `LoginToken`。内核自己的测试与 `dotnet new smart-app` 的 `Tests/` 都用它；不引用任何内核包，也不进 `SmartAdmin` 元包 |
+
+## 中心化包版本管理
+
+`Directory.Packages.props` 开启了 `ManagePackageVersionsCentrally=true`。所以各个 `.csproj` 只写包名，版本号统一锁在这一份文件里，写法是 `<PackageReference Include="..." />`。其中几处版本号的注释直接写明了 CVE 缘由，不只是跟着上游走：
+
+- `SQLitePCLRaw.bundle_e_sqlite3` 显式抬到 `3.0.3`。Microsoft.Data.Sqlite 传递依赖的 2.1.10/2.1.11 命中了 SQLite 的一个 CVE（NU1903 GHSA-2m69-gcr7-jv3q），3.0.x 起已经修补。
+- `Microsoft.OpenApi` 显式抬到 `2.7.5`。`Microsoft.AspNetCore.OpenApi` 10.0.9 传递依赖的 2.0.0 命中一个高危 CVE（NU1903 GHSA-v5pm-xwqc-g5wc，影响范围 2.0.0-preview.11 至 2.7.4），2.7.5 起修补。
+- `Microsoft.Extensions.DependencyInjection.Abstractions` 抬到 `10.0.5`。`StackExchange.Redis` 3.0.11 传递依赖的 `Logging.Abstractions` 10.0.5 要求 `DI.Abstractions` ≥10.0.5。不抬版本的话，集中管理的 10.0.0 会跟它冲突，报 NU1605 降级错误。
+
+`Directory.Build.props` 为所有项目统一设置构建与包元数据：
+
+- `TargetFramework` 是 `net10.0`，`Nullable` 与 `ImplicitUsings` 都已开启。
+- `GenerateDocumentationFile` 开着，同时用 `NoWarn` 压掉 `CS1591`。发布的包因此带 XML 注释，消费方步进源码时看得懂在改哪一步。但不强制每个 public 成员都写注释，免得警告刷屏。
+- NuGet 元数据也统一在这里：`PackageLicenseExpression`(`Apache-2.0`)、`PackageTags`(`admin;rbac;sqlsugar;aspnetcore;scaffold;kernel`)。`Version` 只是本地构建的占位值，发版时经 `-p:Version` 由 tag 覆盖。
+- SourceLink 靠 `PublishRepositoryUrl`/`EmbedUntrackedSources`/`IncludeSymbols`（符号包用 `snupkg` 格式）接好，消费方调试时能直接步进内核源码。`ContinuousIntegrationBuild` 只在 `GITHUB_ACTIONS` 环境变量存在时才开，因为它会把内嵌源码路径规范化，本地开着反而会打乱调试路径。
+
+::: tip `IsPackable` 默认是 false
+`Directory.Build.props` 把 `IsPackable` 默认设为 `false`，`src/` 下每个正式包再显式打开。示例与测试项目沿用默认值，永远不会被打包。
+:::
+
+## 示例宿主
+
+`backend/samples/MinimalHost/Program.cs` 是消费方真正会照抄的启动代码，下面是节选，完整版还接了 WeCom/DingTalk/GitHub/WeChat 四个外部登录可选包和 `AddSmartAdminExcel()`，以该文件为准：
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSmartAdminRedisCache(builder.Configuration);
+builder.Services.AddSmartAdmin(builder.Configuration);
+var app = builder.Build();
+app.MapSmartAdmin();
+app.Run();
+```
+
+`AddSmartAdminRedisCache` 在这里被调用了，且排在 `AddSmartAdmin()` 之前。但只要配置里没把 `SmartAdmin:Cache:Provider` 设成 `Redis`，它就是空操作，不影响零配置体验（SQLite + 进程内缓存）。完整文件里那几个外部登录包与 `AddSmartAdminExcel()` 同样是「没配对应配置节就是空操作」；把这些可选包调用整段去掉，剩下的就是真正零配置的最小宿主。
+
+它的 `appsettings.json` 默认关闭文件日志（`SmartAdmin:Logging:File:Enabled: false`），诊断信息靠 stdout 采集。标准 ASP.NET Core 日志级别照常设置。`appsettings.Development.json.example` 是被 gitignore 的 `appsettings.Development.json` 的模板，只放了种子超管账号名和一个空密码（留空是为了让内核首启时打印一个随机密码）。`Properties/launchSettings.json` 把开发环境地址锁定在 `http://localhost:5100`，并设置 `ASPNETCORE_ENVIRONMENT=Development`。
+
+## 测试基础设施
+
+`backend/tests/` 下有两个性质不同的项目：
+
+- **`SmartAdmin.TestHost`** 是一个最小化的*消费方*宿主，不属于自动化测试套件本身。它把自己登记进 `options.ApplicationAssemblies.Add(typeof(Program).Assembly)`，让自己的实体、种子数据、控制器（`SampleWidget`、`SampleDoc`、`CustomDictController`）走一遍消费方挂载路径，供基于 `WebApplicationFactory<Program>` 的测试驱动。它演示的内容详见[搭建业务模块](/zh/guide/business-module)。
+- **`SmartAdmin.Tests`** 才是真正的 xUnit v3 测试套件，靠 `dotnet test` 跑。
+
+多数据库矩阵机制在 `SmartAdmin.Tests/TestDb.cs` 里。它读 `SMART_TEST_DBTYPE`（`MySql` / `SqlServer` / `PostgreSQL`，不设则默认走 SQLite），以及各数据库对应的连接串环境变量（`SMART_TEST_MYSQL`、`SMART_TEST_SQLSERVER`、`SMART_TEST_POSTGRESQL`）。对非 SQLite 的引擎，每次测试运行的库名由一个 `identity` 字符串经 SHA-256 哈希确定性派生，格式是 `smart_it_` 前缀加哈希前 16 位十六进制。同一个 identity 永远对应同一个库，于是「对同一个库二次启动」这类幂等用例才跑得起来。因为 SqlSugar 的 CodeFirst 只建表、不建库，`TestDb` 在 SqlSugar 接手之前，自己经原始的 `MySqlConnection`/`SqlConnection`/`NpgsqlConnection` 直连服务器完成建库和删库。
+
+## 配置节总览
+
+一切都从 `appsettings.json` 的 `SmartAdmin` 节绑定进 `SmartAdminOptions`(`backend/src/SmartAdmin.Core/Options/SmartAdminOptions.cs`):
+
+| 属性 | 子配置类型 | 默认值示例 |
+| --- | --- | --- |
+| `Database` | `AdminDatabaseOptions` | `DbType = "Sqlite"`、`ConnectionString = "Data Source=./data/SmartAdmin.db"`、`EnableCodeFirst = true`；`CodeFirstVersion` 可选，配了就只在它变化时跑 CodeFirst 扫描；`AllowDestructiveSchemaChange = false`，删列、收窄、改非空这类会丢数据的变更默认拒绝启动 |
+| `AdditionalDatabases` | `List<AdminDatabaseConnectionOptions>` | 默认空：副库多 ConfigId 列表；见[配置多数据库](/zh/guide/multi-database) |
+| `Cache` | `AdminCacheOptions` | `Provider = "Memory"`、`KeyPrefix = "smart:"`、`PermissionMinutes = 20` |
+| `Seed` | `AdminSeedOptions` | 超管账号/密码种子 |
+| `Jwt` | `AdminJwtOptions` | 签名密钥/签发者/有效期 |
+| `Security` | `AdminSecurityOptions` | 会话并发策略 |
+| `Upload` | `AdminUploadOptions` | 存储根目录、大小上限、后缀白名单 |
+| `Excel` | `AdminExcelOptions` | 导入/导出的行数与文件大小上限，见[给自己的实体接导入导出](/zh/guide/import-export) |
+| `Email` | `AdminEmailOptions` | 邮件通道：`Host` 留空走日志实现，配了就走 `SmtpEmailSender`，见[认证与安全](/zh/backend/auth-security) |
+| `ExternalAuth` | `AdminExternalAuthOptions` | 外部登录 / SSO 的回调基址与内置 OIDC provider 列表，见[外部登录](/zh/backend/external-login) |
+| `Api` | `AdminApiOptions` | 禁用模块列表 |
+| `Realtime` | `AdminRealtimeOptions` | 实时推送开关与 Hub 路径，默认关闭，见[实时通知](/zh/backend/realtime) |
+| `DemoMode` | `bool` | `false`：为 `true` 时仅放行 GET/HEAD/OPTIONS，其余写请求一律以错误码 `41002` 拒绝 |
+| `Id` | `AdminIdOptions` | `WorkerId`：默认为 `null`，启动时由文件锁在本机抢号；跨机器、跨容器水平扩展时必须为每个实例显式配置。`WorkerIdLockDir`：锁目录，默认机器级路径 |
+| `Logging` | `AdminLoggingOptions` | 文件日志诊断，默认关闭 |
+| `Jobs` | `AdminJobsOptions` | 本副本是否参与定时任务调度、心跳与选主租约、HTTP 任务的 SSRF 围栏、SQL 任务总闸，见[定时任务](/zh/guide/scheduled-jobs) |
+
+`ApplicationAssemblies` 是个例外。它是代码侧设置的 `List<Assembly>`（如上面示例宿主与 `TestHost` 的代码片段所示），不从配置绑定，因为程序集引用没法从 JSON 里来。
+
+摸清了结构，下一步自然是看这几个包如何装配到一起。[架构分层与包依赖](/zh/backend/architecture)从依赖方向讲起；构建、测试的 CLI 命令则在[贡献指南](/zh/community/contributing)里。

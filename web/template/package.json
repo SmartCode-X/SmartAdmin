@@ -1,0 +1,36 @@
+{
+  "name": "smart-admin-app",
+  "version": "10.10.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "gen:api": "node scripts/gen-api.mjs"
+  },
+  "dependencies": {
+    "@iconify/vue": "^5.0.1",
+    "@vueuse/core": "^14.4.0",
+    "naive-ui": "^2.45.3",
+    "pinia": "^4.0.3",
+    "smart-admin-web": "10.10.0",
+    "smart-naive-icon": "^2.0.0",
+    "smart-naive-table": "^2.0.0",
+    "vue": "^3.5.42",
+    "vue-i18n": "^11.4.10",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "openapi-typescript": "^7.6.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11",
+    "vue-tsc": "^3.3.11"
+  }
+}

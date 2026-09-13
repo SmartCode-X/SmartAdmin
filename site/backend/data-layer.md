@@ -1,0 +1,159 @@
+# Data Layer and Auditing
+
+The line of business code that queries orders writes neither `IsDelete == false` nor any org condition, yet both conditions reach the final SQL. `SqlSugarSetup` put them there: the whole process holds a single `SqlSugarScope`, and its query filters and audit AOP are attached once when it's constructed, so from then on nothing slips past them.
+
+## One `SqlSugarScope` singleton
+
+`ISqlSugarClient` is registered as a singleton in the form of `SqlSugarScope` — the thread-safe form officially recommended by SqlSugar (it builds a Client per thread internally). At construction time it attaches global filters, audit AOP, and SQL diagnostic logging. By default there is a single main connection whose ConfigId is fixed as `SmartAdmin`.
+
+To watch statement by statement what the ORM actually generates during development, there's a separate console log that ships off: [SQL Console Log](./sql-log.md).
+
+```csharp
+// Main database (the zero-config path)
+// ConfigId = "SmartAdmin"; hooks: soft-delete + data-scope + audit AOP + failed/slow SQL logging
+return new SqlSugarScope(mainConfig, client => { /* attach filters + AOP + logging */ });
+```
+
+### Multiple databases (multiple ConfigIds)
+
+The main database is still one connection. To attach a log or legacy store, use `SmartAdmin:AdditionalDatabases` and `db.AsTenant().GetConnection("Audit")`. `IRepository<T>` always hits main.
+
+Field reference, pitfalls, and a minimal walkthrough: [Configure Multiple Databases](/guide/multi-database).
+
+## Global query filters
+
+Both filters are registered against entities matched **by interface**. SqlSugar's `AddTableFilter<T>` only recognizes an interface or an exact type, not a base class — which is why the markers go through the interfaces `ISoftDelete` / `IOrgScoped` rather than the base classes `BaseEntity` / `DataEntity`.
+
+### Soft delete
+
+For entities implementing `ISoftDelete`, queries automatically exclude deleted rows:
+
+```csharp
+client.QueryFilter.AddTableFilter<ISoftDelete>(e => e.IsDelete == false);
+```
+
+Deleted data is naturally invisible to every query. To query deleted data when genuinely needed, explicitly lift the filter with `.ClearFilter<ISoftDelete>()`.
+
+### Data scope
+
+For `IOrgScoped` entities (i.e. `DataEntity` and its subclasses), results are filtered by the effective org set resolved for the current request:
+
+```csharp
+client.QueryFilter.AddTableFilter<IOrgScoped>(e =>
+    scope.Current.IsUnrestricted == true
+    || (e.CreateOrgId != null && scope.Current.OrgIds.Contains(e.CreateOrgId.Value))
+    || (scope.Current.IncludeSelf == true && e.CreateUserId == scope.Current.UserId));
+```
+
+The three `scope.Current` properties in the expression are independent of the entity parameter, so SqlSugar evaluates them locally into constants first (the org set is rendered as a SQL `IN`), then splices them into the WHERE clause. When `IsUnrestricted`, the whole predicate is always true — no filtering happens.
+
+::: warning Data scope only applies to queries
+The global data-scope filter only applies to SELECT — not to primary-key-based `Updateable` / `Deleteable`. To cover this, `SqlSugarRepository<TEntity>` has a built-in write-path scope guard for `UpdateAsync` / `DeleteAsync` on `IOrgScoped` entities: before writing, it queries through the scope-filtered path to confirm the target row is within the current data scope; attempting to modify/delete a row from another org returns 0 rows — secure by default. Writes that bypass the repository via the `Db.Updateable` / `Deleteable` escape hatch aren't covered by this guard and must validate ownership themselves.
+:::
+
+## AOP auto-fills audit fields
+
+`SqlSugarScope`'s `Aop.DataExecuting` hook backstops the infrastructure fields on insert/update. Business code never touches these fields.
+
+| Field | Timing | Fill rule |
+| --- | --- | --- |
+| `Id` | Insert | Filled with a snowflake Id when `Id == 0`; an explicitly given value (e.g. seed data) is preserved as-is |
+| `CreateTime` | Insert | Filled with the current time if unset |
+| `CreateUserId` | Insert | Filled from the current logged-in user; left empty for a system context |
+| `CreateOrgId` | Insert | Filled from the current user's owning org (only present on `DataEntity`) |
+| `UpdateTime` | Update | Refreshed on every full-row update |
+| `UpdateUserId` | Update | Records the operator when a login context is present |
+
+```csharp
+client.Aop.DataExecuting = (_, info) =>
+{
+    switch (info.OperationType)
+    {
+        case DataFilterType.InsertByObject:
+            if (info is { PropertyName: nameof(BaseEntity.Id), EntityValue: BaseEntity { Id: 0 } })
+                info.SetValue(idGen.NextId());
+            // …CreateTime / CreateUserId / CreateOrgId backstopped the same way
+            break;
+        case DataFilterType.UpdateByObject:
+            // …UpdateTime refreshed every time, UpdateUserId records the operator
+            break;
+    }
+};
+```
+
+::: warning `CreateOrgId` is the data-scope anchor
+`CreateOrgId` = the org the creator belonged to at creation time, auto-filled by the AOP hook from `ICurrentUser.OrgId` (the token's `org` claim) on insert. The data-scope filter uses exactly this field to decide row visibility. **If this field isn't filled, org-dimension data-scope queries will return 0 rows for a business table, always** — the data is in the database, but unreachable by query. `null` means the row isn't constrained by org scope (built-in system data, or a creator with no owning org).
+:::
+
+## Entity base classes
+
+Business entities pick a base class by **which capabilities they need**. Five base classes form a chain, each level adding one more:
+
+```text
+PrimaryId          primary key Id only
+  └─ AuditEntity   + the audit quartet (CreateTime / CreateUserId / UpdateTime / UpdateUserId)
+       ├─ BaseEntity      + soft delete IsDelete         implements ISoftDelete
+       │    └─ DataEntity      + org anchor CreateOrgId  implements IOrgScoped
+       └─ OrgAuditEntity  + org anchor CreateOrgId        implements IOrgScoped
+```
+
+| Base class | Audit | Soft delete | Org isolation | Used for |
+| --- | --- | --- | --- | --- |
+| `PrimaryId` | No | No | No | Detail/child tables. **Can't use the built-in repository or be seeded** (`IRepository<T>` is constrained to `where T : BaseEntity`) — typically read/written alongside the parent table in the same transaction via `ISqlSugarClient` |
+| `AuditEntity` | Yes | No | No | Tables that genuinely need real deletes but still want a paper trail: hard-deletable join tables, append-only log tables |
+| `BaseEntity` | Yes | Yes | No | Globally shared tables: dictionaries, config, the org tree itself |
+| `DataEntity` | Yes | Yes | Yes | Business tables needing "current org / current org and below / self only / custom" isolation |
+| `OrgAuditEntity` | Yes | No | Yes | Tables that need org isolation but also genuinely need real deletes |
+
+**For the two without soft delete, the repository's `DeleteAsync` is a physical delete** — the row is removed from the database, no recycle bin, no `RestoreAsync`. Ask whether a table needs a recycle bin before picking its base class.
+
+Both org-isolated base classes (`DataEntity` / `OrgAuditEntity`) get the write-path guard: the repository's `UpdateAsync`/`DeleteAsync` has a built-in scope check for `IOrgScoped` entities, and modifying/deleting a row from another org is rejected, returning 0 rows.
+
+## Generic repository `IRepository<>`
+
+The standard entry point for data access — an open generic registered once, ready to use for any entity. Just inject it through the constructor:
+
+```csharp
+public class DeviceService(IRepository<Device> repo) : IDeviceService
+{
+    public Task<Device?> Get(long id) => repo.GetByIdAsync(id);  // automatically carries soft-delete + data-scope filters
+}
+```
+
+Every query automatically carries the global filters. For complex operations the repository can't cover (joins, transactions, batches), use SqlSugar's native capabilities directly via `repo.Db` — the repository is a convenience layer, not an abstraction that locks the ORM in a cage. Common methods: `AsQueryable` / `GetByIdAsync` / `GetFirstAsync` / `AnyAsync` / `InsertAsync` / `InsertRangeAsync` / `UpdateAsync` / `DeleteAsync` (soft delete) / `HardDeleteAsync` (physical delete) / `RestoreAsync` (restore).
+
+## Snowflake `WorkerId`
+
+Primary key `Id` values are produced by `IIdGenerator`, whose default implementation is a self-written, single-file snowflake algorithm `SnowflakeIdGenerator` (zero third-party dependencies). 64-bit layout:
+
+```text
+┌─1 bit──┬─────────41 bit─────────┬──6 bit──┬──6 bit──┐
+│ sign 0 │ ms timestamp from epoch │ worker  │ seq/ms  │
+└────────┴─────────────────────────┴─────────┴─────────┘
+```
+
+The fixed 12 low-order bits (6 for machine + 6 for sequence) weren't chosen arbitrarily: 41+12=53, so every ID stays below 2^53, within JS's `Number.MAX_SAFE_INTEGER` — the frontend can parse a `long` primary key as a plain number without losing precision. Capacity: 64 machines, 64 IDs per machine per millisecond.
+
+Those same 12 bits also carve out the seeds' territory: `id = milliseconds-from-epoch × 4096 + low bits`, so a snowflake can never issue a number below 4096, and `[1, 999]` is safely reserved for the kernel's built-in seeds on that basis. Consumers allocate their numbers from `1000` up, but the ceiling isn't a hardcoded number — on startup, `DatabaseInitializer` computes "the smallest snowflake Id obtainable from this moment on" (`SnowflakeIdGenerator.CurrentFloor()`), and any seed Id strictly below that value can never collide with an Id this instance actually generates from now on, since the clock only moves forward. On startup, `DatabaseInitializer` verifies that every seed Id falls within this dynamic ceiling and isn't reused within a single entity: an out-of-range Id (which a snowflake would sooner or later catch up to and collide with on the primary key) or a duplicate (whose idempotent existence check would silently skip the later row as "already present") both throw at startup, and CI carries cases that catch this class of error before the host even boots.
+
+The worker number has two sources. Leave `SmartAdmin:Id:WorkerId` unset and the kernel claims a free slot on this machine at startup with an exclusive file lock: it opens `worker-00.lock` through `worker-63.lock` in turn, the first one it can lock is this process's number, and the handle stays open until the process exits. Set it and the configured value is used as-is, with no lock taken:
+
+```json
+{
+  "SmartAdmin": {
+    "Id": { "WorkerId": 3 }
+  }
+}
+```
+
+The lock closes the same-machine multi-process hole. During an IIS app-pool overlapped recycle the old and new w3wp run side by side; a web garden, or two deployments on one box, is the same story. They read the same configuration, get the same worker number, and one ID each in the same millisecond collides on the primary key. Nearly every "duplicate IDs at the same instant under load" incident in production comes from here — the algorithm itself is fine. With the lock, the old process holds 0, the new one can't lock it and lands on 1, so sharing a number is structurally impossible. The lock directory defaults to a machine-level path (`%ProgramData%\SmartAdmin\workerid` on Windows, `/tmp/smartadmin/workerid` elsewhere); change it with `SmartAdmin:Id:WorkerIdLockDir` only when the default isn't writable. If the directory is unusable, or all 64 slots are taken, the kernel refuses to start rather than issue a possibly duplicate ID.
+
+::: danger Every instance must differ across machines and containers
+A file lock is only exclusive within one machine and one lock directory. **When scaling horizontally across machines or containers, each instance must be configured with a different `WorkerId`** — otherwise two instances issuing IDs in the same millisecond will collide on the primary key. If two machines share the same `WorkerId`, the 6 bits that encode the machine number in the ID are identical on both. If the sequence bits also happen to start from the same count within that same millisecond, the two resulting 64-bit numbers come out byte-for-byte identical. This is a data-corruption-class problem, and it happens silently by default.
+
+The kernel provides two lines of defense. If Redis caching is chosen (a clear sign of multi-instance intent) but `WorkerId` isn't set explicitly, startup throws immediately — turning a silent primary-key collision into a readable startup error. For a genuinely single-instance deployment, set it to `0` explicitly to signal intent; on k8s, a StatefulSet's pod ordinal can be injected. The second line is in the database: on startup each instance takes a lease on its worker number in the `sys_worker_lease` table and renews it periodically; if another *live* instance on the same database already holds that number, the latecomer throws at startup.
+:::
+
+The weight of that rule sits on the word "live". A node name has two halves: before the `@` is `{machine name}#{worker number}`, after it is an instance token regenerated on every startup. Renewal and release write conditionally on the full node name, so a process coming back from the dead cannot renew the lease its successor now owns. Only the first half, plus whether the previous holder's process is still running, decides whether startup is blocked. Same machine, same number, previous pid gone: the new process takes the lease over immediately rather than waiting for it to expire. A hard kill never reaches the release path — stopping the debugger, closing the console window, ending the task all qualify. The row it leaves behind will not block the next startup, and neither will a container restart that lands on the same pid. Two cases genuinely block: another process on this machine is alive and holding the same number, or another machine holds it while both point at the same database. The error names the other node, its pid, the seconds left on the lease, and the SQL that clears a stale lease once you have confirmed the other side is down.
+
+On clock safety: `SnowflakeIdGenerator` takes an injected `TimeProvider` (testable). On detecting a clock rollback, it spin-waits briefly (≤5ms, NTP-adjustment scale) to catch back up; on a large rollback, it throws outright and refuses to issue an ID — it never issues an ID that might be a duplicate.

@@ -1,0 +1,99 @@
+{
+  "name": "smart-admin-web",
+  "version": "10.10.0",
+  "description": "SmartAdmin 前端内核:布局、路由、鉴权、内置系统页与共享组件,配合 SmartAdmin NuGet 包使用",
+  "keywords": [
+    "smartadmin",
+    "admin",
+    "rbac",
+    "vue3",
+    "naive-ui"
+  ],
+  "homepage": "https://smartcode-x.github.io/SmartAdmin/",
+  "bugs": {
+    "url": "https://github.com/SmartCode-X/SmartAdmin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SmartCode-X/SmartAdmin.git",
+    "directory": "web/packages/admin"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/style.css",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "vue-tsc --noEmit && vite build",
+    "prepack": "npm run build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "gen:api": "node scripts/gen-api.mjs",
+    "gen:icons": "node scripts/gen-icon-subset.mjs"
+  },
+  "peerDependencies": {
+    "@iconify/vue": "^5.0.1",
+    "@vueuse/core": "^14.4.0",
+    "naive-ui": "^2.45.3",
+    "pinia": "^4.0.3",
+    "smart-naive-icon": "^2.0.0",
+    "smart-naive-table": "^2.0.0",
+    "vue": "^3.5.42",
+    "vue-i18n": "^11.4.10",
+    "vue-router": "^4.5.0"
+  },
+  "dependencies": {
+    "@iconify-json/ant-design": "^1.2.9",
+    "@iconify-json/ep": "^1.2.4",
+    "@iconify-json/lucide": "^1.2.129",
+    "@iconify-json/ph": "^1.2.2",
+    "@microsoft/signalr": "^10.0.11",
+    "echarts": "^6.1.0",
+    "highlight.js": "^11.12.0",
+    "md-editor-v3": "^6.5.6",
+    "openapi-fetch": "^0.17.0",
+    "pinia-plugin-persistedstate": "^4.2.0",
+    "sortablejs": "^1.15.7",
+    "vue-echarts": "^8.2.0"
+  },
+  "devDependencies": {
+    "@iconify/utils": "^3.1.7",
+    "@iconify/vue": "^5.0.1",
+    "@types/node": "^22.13.0",
+    "@types/sortablejs": "^1.15.9",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vueuse/core": "^14.4.0",
+    "happy-dom": "^20.13.2",
+    "naive-ui": "^2.45.3",
+    "openapi-typescript": "^7.6.1",
+    "pinia": "^4.0.3",
+    "smart-naive-icon": "^2.0.0",
+    "smart-naive-table": "^2.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11",
+    "vite-plugin-dts": "^5.1.0",
+    "vitest": "^4.1.10",
+    "vue": "^3.5.42",
+    "vue-i18n": "^11.4.10",
+    "vue-router": "^4.5.0",
+    "vue-tsc": "^3.3.11"
+  }
+}

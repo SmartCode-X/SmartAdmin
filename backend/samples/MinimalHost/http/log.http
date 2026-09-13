@@ -1,0 +1,51 @@
+### SmartAdmin 示例宿主 —— 日志(操作 / 登录 / 异常)
+# 操作日志默认记一切写操作(读操作与匿名端点除外),所以跑过前面几个文件之后这里就有数据了。
+# 三条清空是硬删、不可恢复,自己也挂了 [OperationLog]:谁清的日志同样留痕。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 操作日志分页 —— 审计要回答「谁、什么时候、干了什么」,所以能按操作人/时间/路径筛
+# path 是模糊匹配:填 /api/v1/sys/role 就能捞出角色相关的全部动作
+GET {{host}}/api/v1/sys/log/op/page?current=1&size=20&success=true
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 按时间段 + 路径筛操作日志
+GET {{host}}/api/v1/sys/log/op/page?current=1&size=20&path=/api/v1/sys/user&startTime=2026-01-01T00:00:00&endTime=2026-12-31T23:59:59
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 导出操作日志 xlsx —— query 复用上面的全部筛选
+# 可选列 Key:Title HttpMethod Path ResultCode Success OperatorName Ip ElapsedMs CreateTime ExceptionMessage
+GET {{host}}/api/v1/sys/log/op/export?columns=Title,Path,OperatorName,ResultCode,CreateTime
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 登录日志分页 —— 失败的行 resultCode 就是具体原因码,配 meta/error-codes 看
+GET {{host}}/api/v1/sys/log/login/page?current=1&size=20&account=superAdmin
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 异常日志分页 —— 未捕获异常的旁路留痕(业务异常不进这里)
+GET {{host}}/api/v1/sys/log/exception/page?current=1&size=20
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 清空操作日志 —— 硬删,不可恢复
+DELETE {{host}}/api/v1/sys/log/op
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 清空登录日志 —— 硬删,不可恢复
+DELETE {{host}}/api/v1/sys/log/login
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 清空异常日志 —— 硬删,不可恢复
+DELETE {{host}}/api/v1/sys/log/exception
+Authorization: Bearer {{login.response.body.$.data.accessToken}}

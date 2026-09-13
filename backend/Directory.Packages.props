@@ -1,0 +1,46 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 唯一的非 Microsoft 运行时依赖。它传递下来的驱动版本决定了下面三个测试驱动该钉在哪,
+         所以升它的时候要连 nuspec 一起看:5.1.4.219 把 MySqlConnector 抬到了 2.6.2,SqlClient 与 Npgsql 没动 -->
+    <PackageVersion Include="SqlSugarCore" Version="5.1.4.219" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+    <!-- 显式抬版:MDS 传递的 2.1.10/2.1.11 命中 SQLite CVE(NU1903 GHSA-2m69-gcr7-jv3q),3.0.x 已修补 -->
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <!-- 跟随 2.x 线上的最新补丁,不上 3.x:AspNetCore.OpenApi 10.0.11 声明的区间就是 [2.7.5, 3.0.0),3.x 的 IOpenApiMediaType 把 Schema/Example 做成只读,OpenApi 转换器编不过。
+         下界 2.7.5 同时是 CVE 修补线(NU1903 GHSA-v5pm-xwqc-g5wc,漏洞范围 2.0.0-preview.11~2.7.4) -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.2" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.11" />
+    <!-- DI/Logging 抽象与其余 Microsoft.Extensions.* 一起走补丁线:StackExchange.Redis 3.1.31 传递依赖 Logging.Abstractions,
+         集中版本落后会报 NU1605 降级;补丁级上抬对既有项目安全 -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    <!-- 仅 SmartAdmin.Caching.Redis 可选包直接引用(RedisCacheProvider);核心四包不引,保持"运行时只依赖 SqlSugarCore + Microsoft.*" -->
+    <PackageVersion Include="StackExchange.Redis" Version="3.1.31" />
+    <!-- 仅 SmartAdmin.Excel 可选包直接引用:MiniExcel 读写 xlsx;DocumentFormat.OpenXml 只生成带 dataValidation 的模板。核心四包不引 -->
+    <PackageVersion Include="MiniExcel" Version="1.46.0" />
+    <PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
+    <!-- 可选包读取 SmartAdmin:Cache 配置节自装配用(RedisSetup);同属 Microsoft.* -->
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
+    <!-- 仅 samples/WorkerHost 用(纯 Generic Host,没有 ASP.NET 共享框架可蹭);内核包一律只依赖 Abstractions -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11" />
+    <!-- 测试:xUnit v3 + WebApplicationFactory。v3 的测试项目自身就是可执行程序,跑在 Microsoft.Testing.Platform 上;
+         不引 VSTest 那一套(Microsoft.NET.Test.Sdk + xunit.runner.visualstudio):.NET 10 SDK 上 MTP 2.x 拒绝在 VSTest 下运行 -->
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
+    <!-- 三个方言驱动只有 SmartAdmin.Testing 直接引用(建/删测试库;内核测试项目经它传递拿到);
+         版本一律对齐 SqlSugarCore 5.1.4.219 传递的版本,不引入漂移——编译期用一个版本、运行期跑 SqlSugar 带来的另一个。
+         核心四包不直接引用它们(保持"运行时只依赖 SqlSugarCore + Microsoft.*";驱动本就随 SqlSugarCore 传递可用) -->
+    <PackageVersion Include="MySqlConnector" Version="2.6.2" />
+    <!-- 它是 Microsoft.*,不违反核心的运行时依赖红线 -->
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageVersion Include="Npgsql" Version="5.0.18" />
+  </ItemGroup>
+</Project>

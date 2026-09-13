@@ -1,0 +1,63 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+.vs/
+artifacts/
+*.nupkg
+*.snupkg
+
+## 应用运行时数据
+data/
+*.db
+*.db-journal
+# 文件日志（SmartAdmin:Logging:File，默认关闭）；无前导斜杠 → 匹配任何宿主下的 logs/
+logs/
+# 含内部斜杠的模式会锚定到仓库根目录；只有 **/ 前缀才能匹配任何宿主下的上传目录
+# （如 samples/*/wwwroot）
+**/wwwroot/upload/
+
+## 后端本地开发配置（包含种子凭据，不提交；使用 .example 模板 + dotnet user-secrets）
+backend/**/appsettings.Development.json
+
+## 前端（web/）与文档站（site/）
+# node_modules/ 与 dist/ 无前导斜杠 → 已覆盖 site/node_modules 和 site/.vitepress/dist
+node_modules/
+dist/
+# VitePress 构建缓存（含内部斜杠会锚定到根，需 **/ 前缀才能匹配 site/ 下）
+**/.vitepress/cache/
+**/.vitepress/.temp/
+
+## docker compose 的本地环境变量（照 .env.example 复制而来，含 JWT 密钥与库口令）
+.env
+.env.local
+# Playwright 产物：web/.gitignore 已忽略 web/ 下的同名目录，但从仓库根运行时会遗漏这些
+test-results/
+playwright-report/
+
+## 工具/Agent 状态（本地工具产物，不提交；无前导斜杠 → 任意深度匹配，含 backend/.omc）
+.omc/
+.omx/
+.codegraph/
+# 本地 Claude Code 钩子脚本：提交的 .claude/settings.json 只有权限白名单，没有引用任何钩子，
+# 所以此目录是各人自己的。
+# 如果将来需要所有协作者都获得某个钩子（如"版本号只能写入 Directory.Packages.props"），
+# 提交 hooks/ 并在 settings.json 里引用——届时取消忽略此行。
+.claude/hooks/
+.claude/launch.json
+.claude/settings.local.json
+
+## 后端临时/验证脚本
+backend/scratchpad/
+
+## 开发脚本（mac/linux）运行时目录
+.dev/
+
+## 同步工具冲突副本/传输临时文件（Syncthing 等生成的本地垃圾文件）
+*.sync-conflict-*
+~syncthing~*
+
+## /loop 任务账本（跨轮记忆，操作态，不提交）
+.loop/

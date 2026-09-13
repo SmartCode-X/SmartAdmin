@@ -1,0 +1,174 @@
+/**
+ * SmartAdmin 设计 tokens —— 唯一色源(single source of truth)
+ * 来源:Claude Design 工程「设计系统 Design Tokens」(docs/design-mockups/design-tokens.dc.html)提炼。
+ * spike/theme-refresh:色板整层换为 daisyUI(MIT)企业向主题 —— 亮色采 corporate;
+ *   暗色:深蓝黑渐变底(slate 950/900)+ 贴近背景的深色卡片 + 青绿主色。
+ *
+ * 分层:
+ *   1) 原语色板 --color-gray-* / 语义色基色 —— 固定值,不随主题翻转。
+ *   2) 角色令牌 --color-bg-* / --color-text-* / --color-border* / --color-fill* / --color-primary* / --color-mask
+ *      —— 语义化,随主题翻转:亮色在 :root,暗色在 [data-theme="dark"] 覆盖。--color-primary* 还会被
+ *      useTheme 按当前 accent 在运行时重算、写回 document.documentElement,这里两套 :root 值只是初始展示。
+ *      业务只用角色令牌,不直接用原语。
+ *   3) 字号 / 间距 / 圆角 —— 与主题无关,仅在 :root。
+ *   4) 阴影 —— 亮色在 :root,暗色覆盖(暗底需更重)。
+ *
+ * 明暗切换:在 <html> 上打 data-theme="dark"(不打即亮色)。
+ */
+
+:root {
+  /* ── 原语:中性色阶(daisyUI corporate 系,纯中性灰 + 藏蓝墨色深端)──── */
+  --color-gray-900: #181a2a; /* 主文字 / 标题(corporate base-content) */
+  --color-gray-800: #2f313f; /* 正文加强 */
+  --color-gray-700: #5d5f6a; /* 次级文字 */
+  --color-gray-600: #7b7c85; /* 辅助文字 / 图标 */
+  --color-gray-500: #85868e; /* 占位 / 说明文字(对比度加深档,≥3:1) */
+  --color-gray-400: #bababf; /* 禁用文字 */
+  --color-gray-300: #d1d1d1; /* 重边框 / 分隔线(corporate base-300) */
+  --color-gray-200: #e3e3e3; /* 常规边框 */
+  --color-gray-100: #f1f1f1; /* 填充 / hover 底 */
+  --color-gray-50: #f0f0f0; /* 页面背景底(corporate base-200 柔化) */
+  --color-white: #ffffff;
+
+  /* ── 角色令牌:主色四态(:root 里是初始展示值;运行时由 useTheme 按当前 accent 重算并写回
+        document.documentElement;靛蓝 #646CFF 是 6 个候选之一,也是 Logo 固定不变的品牌色)── */
+  --color-primary: #646cff; /* 默认态 · 主按钮 / 链接 / 选中 */
+  --color-primary-hover: #7d84ff; /* 悬浮 hover · 加亮一档 */
+  --color-primary-pressed: #5259d1; /* 按下 pressed / active */
+  --color-primary-light: #f0f0ff; /* 浅底 · 选中背景 / 标签底 */
+
+  /* ── 原语:语义色(base + 浅底 light-bg,亮色;corporate 语义色,
+        warning/error 原值偏浅、按正文可读加深一档)─────────────── */
+  --color-success: #00a43b;
+  --color-success-bg: #e0f4e7;
+  --color-warning: #a88400;
+  --color-warning-bg: #fff8e0;
+  --color-danger: #d15054;
+  --color-danger-bg: #ffeced;
+  --color-info: #0090b5;
+  --color-info-bg: #e0f2f6;
+
+  /* ── 角色令牌(亮色主题)—— 业务只消费这一层 ─────────────────── */
+  --color-bg-body: #f2f8f5; /* 浅色页面背景:护眼浅绿 */
+  --color-bg-app: linear-gradient(
+    135deg,
+    #f7fbf9 0%,
+    #edf7f3 55%,
+    #f7fbf9 100%
+  ); /* 整页护眼绿渐变(暗色换深蓝黑) */
+  --color-bg-container: rgba(255, 255, 255, 0.78); /* 卡片 / 面板容器:半透明白 + 玻璃模糊 */
+  --color-bg-container-solid: #fefefe; /* 容器色的实底近似(单元格叠在卡片上的实际观感):给表格固定列这类叠在别的内容上、不能透底的场景 */
+  --color-bg-elevated: #ffffff; /* 弹层 / 下拉 / 抽屉:实底白,半透明叠在深色遮罩上会发灰 */
+  --color-text-primary: #111827; /* 主文字 / 标题:灰黑正文,深色清晰 */
+  --color-text-secondary: #374151; /* 次级文字:从灰色提深到 slate-700,表格/菜单/按钮不偏灰 */
+  --color-text-tertiary: #6b7280; /* 占位 / 辅助文字:slate-500,仍可读但低于正文 */
+  --color-text-disabled: #9ca3af; /* 禁用文字:slate-400 */
+  /* 白底 → 填充 → 边框三档亮度必须拉开,否则弹窗里输入框/分组线与底色糊成一片。 */
+  --color-border: #d7dbe0; /* 常规边框 / 分隔 */
+  --color-border-strong: #bfc5cd; /* 强调边框 / 输入描边 / 分组框 */
+  --color-fill: #eef1f5; /* 填充 / 表头 / hover 底 */
+  --color-fill-hover: #e5e9ef; /* 行 hover / 悬浮填充 */
+  /* 输入框两态必须一眼分得开:能填的白底 + 描边,禁用的灰底 + 灰字。 */
+  --color-bg-input: #ffffff; /* 可编辑输入框底 */
+  --color-fill-disabled: #eef1f5; /* 禁用 / 只读输入框底 */
+  --color-mask: rgba(24, 26, 42, 0.45); /* 遮罩 / 弹窗背景 */
+  --color-header-bg: rgba(255, 255, 255, 0.82); /* 顶栏底(配 backdrop-filter: blur(12px)) */
+
+  /* ── 字体 ──────────────────────────────────────────────── */
+  --font-family-base:
+    'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-family-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* 字号阶梯(px / 行高px / 字重),正文默认 14/22 */
+  --font-size-xs: 12px;
+  --line-height-xs: 18px; /* 角标 / 表格次要信息  w400 */
+  --font-size-sm: 13px;
+  --line-height-sm: 20px; /* 次级说明 / 密集表格  w400 */
+  --font-size-base: 14px;
+  --line-height-base: 22px; /* 正文(默认)         w400 */
+  --font-size-md: 16px;
+  --line-height-md: 24px; /* 强调正文 / 卡片标题  w500 */
+  --font-size-lg: 20px;
+  --line-height-lg: 28px; /* 小标题 / 弹窗标题    w600 */
+  --font-size-xl: 24px;
+  --line-height-xl: 32px; /* 页面主标题          w600 */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* ── 间距:4px 基准网格 ────────────────────────────────────── */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+
+  /* ── 圆角(design_handoff_rbac_admin:更圆)──────────────── */
+  --radius-sm: 6px; /* 标签 / 小控件 */
+  --radius-md: 10px; /* 按钮 / 输入 / 表格单元 */
+  --radius-lg: 12px; /* 卡片 / 面板 / 弹层 */
+  --radius-xl: 16px; /* 登录卡 / 大面板 */
+
+  /* ── 阴影(亮色)三级(墨色随 corporate base-content 微调)──────── */
+  --shadow-1: 0 1px 2px rgba(24, 26, 42, 0.05), 0 2px 6px rgba(24, 26, 42, 0.06); /* 卡片 card */
+  --shadow-2: 0 10px 30px rgba(24, 26, 42, 0.12); /* 弹层 popover / 卡片 hover 上浮 */
+  --shadow-3: 0 16px 48px rgba(24, 26, 42, 0.18); /* 悬浮 overlay / 抽屉 */
+
+  /* ── 过渡 ──────────────────────────────────────────────── */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+}
+
+/* ══════════════════════════════════════════════════════════
+   暗色主题:深蓝黑画布 + 贴近背景的深色卡片 + 青绿主色。
+   只覆盖会翻转的角色令牌 / 主色 / 语义色 / 阴影;原语灰阶、字号、间距、圆角保持不变。
+   ══════════════════════════════════════════════════════════ */
+:root[data-theme='dark'] {
+  /* 主色(参考站 teal;运行时由 useTheme 按 accent 重写) */
+  --color-primary: #14b8a6;
+  --color-primary-hover: #2dd4bf;
+  --color-primary-pressed: #0f766e;
+  --color-primary-light: rgba(20, 184, 166, 0.16);
+
+  /* 语义色(暗底提亮一档,沿用参考站 tailwind 色感) */
+  --color-success: #34d399;
+  --color-success-bg: rgba(16, 185, 129, 0.14);
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(251, 191, 36, 0.14);
+  --color-danger: #fb7185;
+  --color-danger-bg: rgba(244, 63, 94, 0.16);
+  --color-info: #38bdf8;
+  --color-info-bg: rgba(56, 189, 248, 0.14);
+
+  /* 角色令牌(slate 950 画布 / slate 800 半透明容器 / slate 900 弹层) */
+  --color-bg-body: #020617; /* 深色页面底色:slate 950 */
+  --color-bg-app: linear-gradient(
+    135deg,
+    #020617 0%,
+    #0f172a 55%,
+    #020617 100%
+  ); /* 深色页面渐变:参考站 slate 950/900 */
+  --color-bg-container: rgba(18, 28, 46, 0.9); /* 卡片/表格容器:贴近深色背景,避免卡片发白 */
+  --color-bg-container-solid: #121c2e; /* 同上:0.9 深蓝叠在卡片上的实底近似 */
+  --color-bg-elevated: #182234; /* 弹层/下拉:比卡片略亮一档,保持层级但不刺眼 */
+  --color-text-primary: #f8fafc; /* 主文字:接近纯白,参考站灰白正文,保证深色下清晰 */
+  --color-text-secondary: #cbd5e1; /* 次级文字取 slate-300:slate-400 在深色背景上会让菜单/表格/按钮发灰 */
+  --color-text-tertiary: #94a3b8; /* 占位/辅助文字:保留层级,但提升到 slate-400 可读档 */
+  --color-text-disabled: #64748b; /* 禁用文字:slate-500,与可用态明显区分 */
+  --color-border: rgba(71, 85, 105, 0.4); /* 深色下边框再收敛,减少“反光”描边 */
+  --color-border-strong: rgba(100, 116, 139, 0.5); /* 强调边框略降透明度,避免暗色太亮 */
+  --color-fill: #0f172a; /* 表头/填充:与深色背景同档,避免表格区域发白 */
+  --color-fill-hover: #1a2436; /* 行 hover:仅比表头亮一档,保持深色清晰 */
+  /* 深色反过来:能填的比卡片更沉(下沉感),禁用的比卡片略亮(平铺、无输入感)。 */
+  --color-bg-input: #0f172a; /* 可编辑输入框底 */
+  --color-fill-disabled: #1b2434; /* 禁用 / 只读输入框底 */
+  --color-mask: rgba(2, 6, 23, 0.72); /* 深色遮罩 */
+  --color-header-bg: rgba(15, 23, 42, 0.7); /* 顶栏底(配 blur) */
+
+  /* 阴影(暗底更重,用于弹层/悬浮) */
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 2px 8px rgba(2, 6, 23, 0.3);
+  --shadow-2: 0 10px 30px rgba(2, 6, 23, 0.45), 0 0 0 1px rgba(51, 65, 85, 0.35);
+  --shadow-3: 0 16px 48px rgba(2, 6, 23, 0.55), 0 0 0 1px rgba(51, 65, 85, 0.4);
+}

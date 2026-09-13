@@ -1,0 +1,37 @@
+{
+  "name": "smart-admin-workspace",
+  "version": "10.10.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/*",
+    "template"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w template",
+    "build": "npm run build -w smart-admin-web && npm run build -w template",
+    "build:lib": "npm run build -w smart-admin-web",
+    "preview": "npm run preview -w template",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "prettier --write packages/admin/src template/src",
+    "format:check": "prettier --check packages/admin/src template/src",
+    "typecheck": "npm run typecheck -w smart-admin-web && npm run typecheck -w template",
+    "test": "npm test -w smart-admin-web",
+    "test:watch": "npm run test:watch -w smart-admin-web",
+    "test:e2e": "playwright test",
+    "gen:api": "npm run gen:api -w smart-admin-web",
+    "gen:icons": "npm run gen:icons -w smart-admin-web"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "oxlint": "^1.81.0",
+    "prettier": "^3.9.6"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}

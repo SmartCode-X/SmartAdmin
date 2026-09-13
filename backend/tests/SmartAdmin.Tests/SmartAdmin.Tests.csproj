@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- xUnit1051:v3 分析器要求每个接受 CancellationToken 的调用都传 TestContext.Current.CancellationToken。
+         本仓库测试都是跑到底的,没有中途取消场景,579 处逐一改只增噪音 -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <!-- 单元测试里用到 ObjectResult 等 MVC 类型,需 ASP.NET 共享框架 -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SmartAdmin.AspNetCore\SmartAdmin.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\SmartAdmin.Auth.GitHub\SmartAdmin.Auth.GitHub.csproj" />
+    <ProjectReference Include="..\..\src\SmartAdmin.Auth.WeChat\SmartAdmin.Auth.WeChat.csproj" />
+    <ProjectReference Include="..\..\src\SmartAdmin.Auth.WeCom\SmartAdmin.Auth.WeCom.csproj" />
+    <ProjectReference Include="..\..\src\SmartAdmin.Auth.DingTalk\SmartAdmin.Auth.DingTalk.csproj" />
+    <ProjectReference Include="..\..\src\SmartAdmin.Caching.Redis\SmartAdmin.Caching.Redis.csproj" />
+    <ProjectReference Include="..\..\src\SmartAdmin.Excel\SmartAdmin.Excel.csproj" />
+    <!-- TestDb / AdminAppFactory<TEntryPoint> / 信封小助手:与消费方、卫星包共用同一份 -->
+    <ProjectReference Include="..\..\src\SmartAdmin.Testing\SmartAdmin.Testing.csproj" />
+    <ProjectReference Include="..\SmartAdmin.TestHost\SmartAdmin.TestHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <!-- 必须直接引:它的 build targets(生成 MvcTestingAppManifest.json 定位宿主 ContentRoot)只对直接引用方生效,
+         经 SmartAdmin.Testing 传递拿不到。三个方言驱动则由 SmartAdmin.Testing 传递而来,这里不重复引 -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+</Project>

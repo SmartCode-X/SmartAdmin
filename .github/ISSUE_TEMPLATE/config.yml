@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞
+    url: https://github.com/SmartCode-X/SmartAdmin/security/advisories/new
+    about: 私下报告，不要开公开 issue——公开等于对所有下游消费方开 0-day。
+  - name: 文档站
+    url: https://smartcode-x.github.io/SmartAdmin/zh/
+    about: 上手、架构、部署、替换内置服务，45 页中英双语。
+  - name: 常见问题
+    url: https://smartcode-x.github.io/SmartAdmin/zh/faq
+    about: 报缺陷之前先扫一眼——密码找不回、表没建出来、权限勾了不生效这类都在这里。

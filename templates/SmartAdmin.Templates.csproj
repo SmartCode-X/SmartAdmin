@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SmartAdmin 的 dotnet new 模板包(PackageType=Template)。
+       刻意置于 backend/ 之外:不继承 backend/Directory.Build.props(net10 / 中央版本管理 / 自动打包 README),
+       content/** 原样打进包、保持纯净;本壳工程只搬运内容,不编译任何代码。
+       打包:dotnet pack templates/SmartAdmin.Templates.csproj -c Release -o artifacts -p:Version=<版本>。 -->
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>SmartAdmin.Templates</PackageId>
+    <Title>SmartAdmin 项目模板</Title>
+    <Description>SmartAdmin 脚手架:dotnet new smart-app 一键生成可运行的消费方后台 host(预接线一个机构隔离示例业务模块)。</Description>
+    <Version>10.0.0</Version>
+    <Authors>SmartCodeX</Authors>
+    <Company>SmartCodeX</Company>
+    <Product>SmartAdmin</Product>
+    <Copyright>Copyright © SmartCodeX</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/SmartCode-X/SmartAdmin</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SmartCode-X/SmartAdmin</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>smartadmin;admin;scaffold;template;dotnet-new;templates</PackageTags>
+    <!-- 与 6 个核心包对齐图标 + 说明页(此包不继承 backend/Directory.Build.props,故显式补)。
+         图标/README 打进包根,不进 content/,不影响 dotnet new 生成物。 -->
+    <PackageIcon>smart-icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+
+    <_TemplateJsonSrc>$(MSBuildThisFileDirectory)content\smart-app\.template.config\template.json</_TemplateJsonSrc>
+    <!-- BaseIntermediateOutputPath(obj\),不是 IntermediateOutputPath:后者要到 SDK 的 targets 里才赋值,
+         此处求值为空 —— 盖过版本的 template.json 会直接落在源码目录里。 -->
+    <_TemplateJsonStamped>$(BaseIntermediateOutputPath)template.json</_TemplateJsonStamped>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- template.json 单独走 StampTemplateVersion 生成的版本(见下),故从原样搬运里排除。
+         PackagePath 里的 content 是两层:ContentTargetFolders(content)再叠上项目内的相对路径(content/smart-app/...)。
+         少写一层,盖过版本的 template.json 就落到另一个空模板根下 —— dotnet new 照样"成功",但一个文件都不生成。 -->
+    <Content Include="content\**\*" Exclude="content\**\bin\**;content\**\obj\**;content\**\.template.config\template.json" />
+    <Content Include="$(_TemplateJsonStamped)" PackagePath="content\content\smart-app\.template.config\template.json" />
+    <!-- 图标 + 说明页放包根(PackagePath="\"),供 nuget.org 页面用;Pack=true 打进包但不参与 dotnet new。 -->
+    <None Include="$(MSBuildThisFileDirectory)..\backend\smart-icon.png" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <Compile Remove="**\*" />
+  </ItemGroup>
+
+  <!-- 把打包版本盖进模板的 SmartPkgVersion 默认值。
+       没有这一步,模板就带着一个写死的版本发出去 —— 而 PackageReference 的 Version 是**最低版本**,
+       消费者 restore 会静默向上漂到 feed 上任意可用版本(NU1603),生成的项目从第一天起就引用着一个从未发布的版本;
+       开了 TreatWarningsAsErrors / 锁文件 / 精确版本策略的消费者则直接失败。
+       templates/smoke-test.ps1 断言生成物精确引用刚打的版本,即为此闸门。 -->
+  <Target Name="StampTemplateVersion" BeforeTargets="Build;GenerateNuspec">
+    <PropertyGroup>
+      <_TemplateJsonText>$([System.IO.File]::ReadAllText('$(_TemplateJsonSrc)'))</_TemplateJsonText>
+      <!-- 结构匹配,不是"文件里有没有这个词":占位符若在别处(比如注释性的 description)也出现过,
+           光找词的守卫就会在 defaultValue 已被改坏时照样放行 —— 守着,但守了个寂寞。 -->
+      <_StampMarker>"defaultValue": "PACK_VERSION_STAMP"</_StampMarker>
+      <_StampValue>"defaultValue": "$(Version)"</_StampValue>
+    </PropertyGroup>
+    <Error Condition="!$(_TemplateJsonText.Contains('$(_StampMarker)'))"
+           Text="template.json 里的 SmartPkgVersion.defaultValue 不是占位符 PACK_VERSION_STAMP:版本盖不进去,模板会带着错误的包版本发布。请改回 &quot;defaultValue&quot;: &quot;PACK_VERSION_STAMP&quot;。" />
+    <PropertyGroup>
+      <_TemplateJsonOut>$(_TemplateJsonText.Replace('$(_StampMarker)', '$(_StampValue)'))</_TemplateJsonOut>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <!-- Escape:MSBuild 会把 Lines 当 item 列表按 ';' 切分,JSON 里将来若出现分号就会被劈开。 -->
+    <WriteLinesToFile File="$(_TemplateJsonStamped)" Lines="$([MSBuild]::Escape($(_TemplateJsonOut)))"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+</Project>

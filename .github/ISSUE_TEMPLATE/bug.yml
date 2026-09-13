@@ -1,0 +1,58 @@
+name: 缺陷报告
+description: 内核、前端包、项目模板或文档站的行为不对
+title: "[bug] "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        安全问题**不要**走这里，按 [SECURITY.md](https://github.com/SmartCode-X/SmartAdmin/blob/main/SECURITY.md) 私下报告——公开 issue 等于对所有下游消费方直接开 0-day。
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: NuGet 包版本；前端问题写 `smart-admin-web` 的版本（应与 NuGet 同号）。
+      placeholder: "10.x.y"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 出问题的位置
+      options:
+        - 后端内核（NuGet 包）
+        - 前端（npm 包 smart-admin-web / 前端模板）
+        - 项目模板（dotnet new smart-app）
+        - Docker / 部署
+        - 文档站
+    validations:
+      required: true
+  - type: input
+    id: database
+    attributes:
+      label: 数据库
+      description: 方言 + 版本。方言相关的问题占了相当一部分，缺这条就得来回问一轮。
+      placeholder: "SqlServer 2022 / MySQL 8.0 / SQLite"
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 从零到看见问题，逐步写。能给一段最小配置或一个失败的测试最好。
+      placeholder: |
+        1. `dotnet new smart-app -n demo`
+        2. 改 appsettings.json 的 …
+        3. `dotnet run`，调 `POST /api/v1/…`
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望的行为 vs 实际的行为
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 错误码
+      description: 后端错误是数字码 + msgKey，把整个信封贴上来最省事。日志会自动按代码块渲染。
+      render: text

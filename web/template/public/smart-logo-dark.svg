@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="SmartAdmin">
+  <defs>
+    <linearGradient id="gTile" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="120">
+      <stop offset="0" stop-color="#7C83FF"/><stop offset="1" stop-color="#4B52E6"/>
+    </linearGradient>
+    <linearGradient id="gMark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#646CFF"/><stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <radialGradient id="gGlow" cx="0.5" cy="0.45" r="0.55">
+      <stop offset="0" stop-color="#22D3EE" stop-opacity=".26"/><stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="120" height="120" rx="27" fill="#0F1222"/>
+  <rect width="120" height="120" rx="27" fill="url(#gGlow)"/>
+  <polygon points="60,20 94.6,40 94.6,80 60,100 25.4,80 25.4,40" fill="none" stroke="url(#gMark)" stroke-width="11" stroke-linejoin="round"/>
+  <path d="M60 60L60.0 39.0M60 60L78.2 49.5M60 60L78.2 70.5M60 60L60.0 81.0M60 60L41.8 70.5M60 60L41.8 49.5" fill="none" stroke="url(#gMark)" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="60.0" cy="39.0" r="5" fill="url(#gMark)"/><circle cx="78.2" cy="49.5" r="5" fill="url(#gMark)"/><circle cx="78.2" cy="70.5" r="5" fill="url(#gMark)"/><circle cx="60.0" cy="81.0" r="5" fill="url(#gMark)"/><circle cx="41.8" cy="70.5" r="5" fill="url(#gMark)"/><circle cx="41.8" cy="49.5" r="5" fill="url(#gMark)"/>
+  <circle cx="60" cy="60" r="8.5" fill="#22D3EE"/>
+</svg>

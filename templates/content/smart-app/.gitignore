@@ -1,0 +1,27 @@
+## 构建产物
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+.vs/
+artifacts/
+
+## 运行时数据 —— data/ 里有 SQLite 库文件,也有开发期自动生成的 JWT 签名密钥
+## (./data/dev-jwt.key)。密钥进了版本库,拿到仓库的人就能签出超管令牌。
+data/
+*.db
+*.db-journal
+logs/
+**/wwwroot/upload/
+
+## 本地开发配置(常放连接串、密钥这类凭据),用 appsettings.json + 环境变量代替提交
+appsettings.Development.json
+appsettings.Local.json
+
+## 前端(若把前端模板 degit 到本仓库的 web/)
+node_modules/
+dist/
+.env.local
+test-results/
+playwright-report/

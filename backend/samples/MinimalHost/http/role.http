@@ -1,0 +1,122 @@
+### SmartAdmin 示例宿主 —— 角色 / 授权 / 数据范围
+# 顺序:登录 → 新增角色 → 授菜单(先去 menu.http 拿菜单 Id)→ 设数据范围 → 关联用户。
+# 数据范围是内核的招牌能力:改完这里,受影响用户的权限与范围缓存立即失效,不用等过期。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 分页查询角色 —— 种子播了 6 个:sys_admin + 五个数据范围演示角色
+GET {{host}}/api/v1/sys/role/page?current=1&size=10
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 新增角色 —— 后面几条用它返回的 Id
+# isDelegatable 留空/false = 不可被非超管转授给他人(安全默认)
+# @name addRole
+POST {{host}}/api/v1/sys/role/add
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "示例角色",
+  "code": "demo_role",
+  "sort": 99,
+  "enabled": true,
+  "remark": "http 样例建出来的角色,用完删掉"
+}
+
+### 角色详情
+GET {{host}}/api/v1/sys/role/{{addRole.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 更新角色 —— 全量替换
+PUT {{host}}/api/v1/sys/role/{{addRole.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "示例角色(已改名)",
+  "code": "demo_role",
+  "sort": 99,
+  "enabled": true,
+  "remark": null
+}
+
+### 该角色当前授予的菜单 Id(授权抽屉回显)
+GET {{host}}/api/v1/sys/role/{{addRole.response.body.$.data.id}}/menus
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 授菜单 —— 全量替换,空数组 = 收回全部
+# menuIds 先跑 menu.http 的「全量菜单树」挑几个粘过来;勾中一个菜单就等于授予了它 permission 上那个路由
+PUT {{host}}/api/v1/sys/role/menu
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "roleId": {{addRole.response.body.$.data.id}},
+  "menuIds": []
+}
+
+### 该角色的数据范围配置(未配置返回 null)
+GET {{host}}/api/v1/sys/role/{{addRole.response.body.$.data.id}}/datascope
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 设数据范围 —— scopeType:1 全部 / 2 本机构 / 3 本机构及以下 / 4 仅本人 / 5 自定义
+# customOrgIds 只在 scopeType = 5 时有意义;下面这条是「本机构及以下」
+PUT {{host}}/api/v1/sys/role/datascope
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "roleId": {{addRole.response.body.$.data.id}},
+  "scopeType": 3,
+  "customOrgIds": null
+}
+
+### 自定义范围的写法:scopeType = 5 + 显式机构集合(2 总经办、6 产品部)
+PUT {{host}}/api/v1/sys/role/datascope
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "roleId": {{addRole.response.body.$.data.id}},
+  "scopeType": 5,
+  "customOrgIds": [2, 6]
+}
+
+### 该角色当前关联的用户 Id
+GET {{host}}/api/v1/sys/role/{{addRole.response.body.$.data.id}}/users
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 授权用户 —— 全量替换;1 是超管,换成 user.http 建出来的那个 Id 更能看出效果
+PUT {{host}}/api/v1/sys/role/users
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "roleId": {{addRole.response.body.$.data.id}},
+  "userIds": []
+}
+
+### 删除角色(级联清掉菜单/用户/数据范围关联)
+DELETE {{host}}/api/v1/sys/role/{{addRole.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 批量删除角色
+POST {{host}}/api/v1/sys/role/batch-delete
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "ids": []
+}

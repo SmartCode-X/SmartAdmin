@@ -1,0 +1,39 @@
+name: 功能提议
+description: 希望内核多做一件事，或希望某个扩展点开出来
+title: "[feat] "
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SmartAdmin 是**可分发的后台内核**，不是应用。判一个提议进不进内核，看的是它对所有消费方是否成立；只对你这一个项目成立的东西，通常应该用替换/覆写扩展点在你自己的工程里做（见文档站的「替换内置服务」）。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你被什么卡住了
+      description: 先说处境，别直接说方案。真实场景比设计稿有说服力。
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 现在你是怎么绕过去的
+      description: 抄了内核的哪段代码、fork 了什么、写了多少重复代码。绕法的成本就是这个提议的价值。
+    validations:
+      required: true
+  - type: dropdown
+    id: shape
+    attributes:
+      label: 你觉得它该长成什么形状
+      options:
+        - 内核内置能力（所有消费方都受益）
+        - 一个扩展点（内核只留接缝，实现留给消费方）
+        - 可选包（引入了第三方依赖，不能进核心包）
+        - 只是文档没写清楚
+    validations:
+      required: true
+  - type: textarea
+    id: breaking
+    attributes:
+      label: 会不会动到公共面
+      description: 会改到 `ErrorCode`、`AdminException`、实体基类字段、`sys_menu` 列、权限码语义、配置节名的，如实说——破坏性变更要攒进 .NET 主版本那一跳。

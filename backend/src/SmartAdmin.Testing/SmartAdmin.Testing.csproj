@@ -1,0 +1,22 @@
+<!-- 测试基础设施包:内核自己的集成测试与消费方 / 卫星包共用同一套 TestDb + AdminAppFactory<TEntryPoint>。
+     不引任何内核项目(它只认配置键与 HTTP,不认类型),也不引 xunit(引了它的 build props 会把本项目翻成可执行程序、
+     标成测试项目,dotnet test 整个 slnx 时会试着去跑它)。元包 SmartAdmin 不引用本包——测试依赖不该跟着进生产。 -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>SmartAdmin 测试基础设施:每测试一库的 TestDb(SQLite / MySQL / SqlServer / PostgreSQL,模板库克隆加速)、AdminAppFactory&lt;TEntryPoint&gt;(一次性库 + 固定超管密码与 JWT 密钥的 WebApplicationFactory)、HTTP 信封小助手。给消费方与卫星包写和内核同等质量的集成测试用。</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- WebApplicationFactory / IWebHostBuilder 在共享框架里;Mvc.Testing 的 build targets 只对直接引用方生效,
+         消费方的测试项目仍要自己直接引一次 Microsoft.AspNetCore.Mvc.Testing(内核自己的 SmartAdmin.Tests 同理) -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- 显式抬版,盖过 MDS 传递的有漏洞 SQLitePCLRaw(NU1903);否则本包会把 CVE 版本传给消费方 -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <!-- 三个方言驱动只用于建 / 删测试库;版本钉在 SqlSugarCore 传递的那个上(见 Directory.Packages.props) -->
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,61 @@
+# 文档站：prose 闸门 → VitePress 构建 → 仓库公开且在 main 上时部署到 GitHub Pages。
+# 仓库设置里 Pages 的 Source 要选 "GitHub Actions"。可见性判断按运行时取，仓库若转私有
+# （Free 计划的私有仓没有 Pages）deploy 会自己跳过，不用回头改工作流。
+name: docs
+
+on:
+  push:
+    branches: [main, dev]
+    # CHANGELOG.md 被 @include 进 changelog 页:改它能把文档站构建改红(死链),必须一起门控
+    paths: ['site/**', 'CHANGELOG.md', '.github/workflows/docs.yml']
+  pull_request:
+    branches: [main, dev]
+    paths: ['site/**', 'CHANGELOG.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      # 闸门自己坏掉会静默放行一切，selftest 排在全站扫前面
+      - run: npm run lint:prose:selftest
+      - run: npm run lint:prose
+      # llms.txt 是给模型读的站点索引，加了新页忘了登记不会有任何东西报错。
+      - run: npm run check:llms
+      - run: npm run docs:build
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9   # v5.0.0
+        with:
+          path: site/.vitepress/dist
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346   # v5.0.1

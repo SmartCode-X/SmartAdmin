@@ -1,0 +1,101 @@
+### SmartAdmin 示例宿主 —— 机构 / 职位
+# 机构树是数据范围的锚:实体上的 CreateOrgId 决定了它落在谁的范围里。
+# 后端只返回平铺列表,树由前端按 parentId 自己拼。
+
+@host = http://localhost:5100
+@account = superAdmin
+@password = <粘贴首启控制台打印的随机密码>
+
+### 登录 —— 先跑这条
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "account": "{{account}}",
+  "password": "{{password}}"
+}
+
+### 全部机构(平铺,按 sort、id 排序)—— 种子播了 7 个,1 是根
+GET {{host}}/api/v1/sys/org/list
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 新增机构 —— parentId 0 表示顶级;code 留空则后端自动生成
+# category 取 org_category 字典的 value:1 公司 / 2 部门 / 3 小组
+# @name addOrg
+POST {{host}}/api/v1/sys/org/add
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "parentId": 3,
+  "name": "示例小组",
+  "code": "demo_team",
+  "category": "3",
+  "sort": 9,
+  "enabled": true
+}
+
+### 机构详情
+GET {{host}}/api/v1/sys/org/{{addOrg.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 更新机构
+PUT {{host}}/api/v1/sys/org/{{addOrg.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "parentId": 3,
+  "name": "示例小组(已改名)",
+  "code": "demo_team",
+  "category": "3",
+  "sort": 8,
+  "enabled": true
+}
+
+### 复制机构子树 —— 整支克隆挂到源节点同级,返回新根 Id;name 留空则给原名加「-副本」
+POST {{host}}/api/v1/sys/org/{{addOrg.response.body.$.data.id}}/copy
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "示例小组-克隆"
+}
+
+### 删除机构 —— 底下还挂着子机构会被拒
+DELETE {{host}}/api/v1/sys/org/{{addOrg.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 分页查询职位
+GET {{host}}/api/v1/sys/position/page?current=1&size=10
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+
+### 新增职位
+# @name addPosition
+POST {{host}}/api/v1/sys/position/add
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "示例职位",
+  "code": "demo_position",
+  "sort": 9,
+  "enabled": true
+}
+
+### 更新职位
+PUT {{host}}/api/v1/sys/position/{{addPosition.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "示例职位(已改名)",
+  "code": "demo_position",
+  "sort": 8,
+  "enabled": false
+}
+
+### 删除职位
+DELETE {{host}}/api/v1/sys/position/{{addPosition.response.body.$.data.id}}
+Authorization: Bearer {{login.response.body.$.data.accessToken}}

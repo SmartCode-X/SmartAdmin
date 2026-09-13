@@ -1,0 +1,197 @@
+# 发版：推 v* tag 触发。verify 全绿才进 publish；publish 用 Trusted Publishing 发 nuget.org 与 npm（都是 GitHub OIDC
+# 换发布权限），仓库里不放任何 NuGet API key 或 npm token。两边都要先建好信任关系，都指向本文件：
+#   nuget.org 策略：Repository Owner=SmartCode-X、Repository=SmartAdmin、Workflow File=release.yml（只填文件名）。
+#   npmjs.com 包 smart-admin-web 的 Trusted Publisher：GitHub Actions、SmartCode-X / SmartAdmin / release.yml，
+#   Allowed actions 要勾上直接 npm publish（不只 stage publish）。
+# 所有 action 钉 commit SHA，尾注标版本：publish 持 id-token: write，一个被改写的浮动 tag 就能直发 nuget.org 与 npm。
+# 升级交给 Dependabot（.github/dependabot.yml），它会连尾注一起改。
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read    # 查同一 SHA 的 ci run 结果（下面的 Reuse 步骤）
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      SMART_TEST_REDIS: localhost:6379
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Tag must sit on main
+        run: |
+          git fetch origin main --quiet
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::tag $GITHUB_REF_NAME is not on main"; exit 1; }
+      - name: Version from tag, cross-check CHANGELOG / web / site badge
+        id: ver
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          grep -q "^## ${ver//./\\.} - " CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md has no '## $ver - <date>' section"; exit 1; }
+          admin_ver=$(node -p "require('./web/packages/admin/package.json').version")
+          [ "$admin_ver" = "$ver" ] \
+            || { echo "::error::web/packages/admin/package.json version is $admin_ver, tag is $ver"; exit 1; }
+          web_ver=$(node -p "require('./web/package.json').version")
+          [ "$web_ver" = "$ver" ] || { echo "::error::web/package.json version is $web_ver, tag is $ver"; exit 1; }
+          template_ver=$(node -p "require('./web/template/package.json').version")
+          [ "$template_ver" = "$ver" ] \
+            || { echo "::error::web/template/package.json version is $template_ver, tag is $ver"; exit 1; }
+          # degit 出去的模板精确钉住同号的前端包：前端页面调的端点跟着后端版本走，浮动范围会装到比 NuGet 新的包
+          template_dep=$(node -p "require('./web/template/package.json').dependencies['smart-admin-web']")
+          [ "$template_dep" = "$ver" ] \
+            || { echo "::error::web/template depends on smart-admin-web $template_dep, expected exactly $ver"; exit 1; }
+          [ "$(grep -c "text: '$ver'" site/.vitepress/config.ts)" -eq 2 ] \
+            || { echo "::error::site/.vitepress/config.ts nav badges are not both '$ver'"; exit 1; }
+      # 同一 SHA 的 ci 已把 backend (sqlite) 跑绿，这里就不重跑（构建一次、晋级发布，省 5 分钟）；查不到照旧全跑。
+      # 只认那个 job 本身 success：ci 有 changes 门控，run 成功不代表后端腿跑过。
+      - name: Reuse the green ci run for this commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          reuse=false
+          for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" --status success --json databaseId --jq '.[].databaseId'); do
+            if gh run view "$id" --repo "$GITHUB_REPOSITORY" --json jobs --jq '.jobs[] | select(.name == "backend (sqlite)") | .conclusion' | grep -qx success; then
+              echo "ci run $id already ran backend (sqlite) green for $GITHUB_SHA; skipping the test step"
+              reuse=true
+              break
+            fi
+          done
+          echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68   # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Build with the release version
+        run: dotnet build backend/SmartAdmin.slnx -c Release -p:Version=${{ steps.ver.outputs.version }} -warnaserror
+      - name: Test (SQLite + Redis)
+        if: steps.ci.outputs.reuse != 'true'
+        run: dotnet test backend/SmartAdmin.slnx -c Release --no-build
+      - name: Template smoke with the real version
+        run: pwsh templates/smoke-test.ps1 -Version "${{ steps.ver.outputs.version }}"
+      - name: Pack (12 kernel packages + template package)
+        run: |
+          ver="${{ steps.ver.outputs.version }}"
+          dotnet pack backend/SmartAdmin.slnx -c Release --no-build -o artifacts -p:Version="$ver"
+          dotnet pack templates/SmartAdmin.Templates.csproj -c Release -o artifacts -p:Version="$ver"
+          count=$(ls artifacts/*.nupkg | wc -l)
+          ls artifacts
+          [ "$count" -eq 13 ] || { echo "::error::expected 13 .nupkg, got $count"; exit 1; }
+      # 前端包在这里打好，publish 只发这个 tgz，持 id-token 的 job 不装依赖、不跑构建脚本。
+      # 不开依赖缓存：tgz 就是要发出去的东西，缓存被投毒会直接进包（npm 官方同样建议发版构建不用缓存）。
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Web package (vitest + pack)
+        working-directory: web
+        run: |
+          npm ci
+          npm test
+          npm pack -w smart-admin-web --pack-destination ../artifacts   # prepack 即 build：vue-tsc + vite 库模式
+          ls -l "../artifacts/smart-admin-web-${{ steps.ver.outputs.version }}.tgz"
+      # 契约发不出即拦发版：起示例宿主抓 /openapi/v1.json，随发行版归档
+      - name: Capture openapi.json
+        run: |
+          (cd backend/samples/MinimalHost && ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://localhost:5100 \
+            dotnet bin/Release/net10.0/MinimalHost.dll > /tmp/host.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:5100/openapi/v1.json -o artifacts/openapi.json 2>/dev/null && break
+            sleep 1
+          done
+          pkill -f MinimalHost.dll || true
+          [ -s artifacts/openapi.json ] || { echo "::error::could not fetch /openapi/v1.json"; cat /tmp/host.log; exit 1; }
+          node -e "const j=require('./artifacts/openapi.json'); if (!j.paths || !Object.keys(j.paths).length) { console.error('openapi has no paths'); process.exit(1) }"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a   # v7.0.1
+        with:
+          name: packages
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 7   # 包同时挂在 GitHub Release 上，这份中转产物不用留 90 天
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      id-token: write   # GitHub OIDC → nuget.org 临时 API key、npm 发布权限
+      contents: write   # 建 GitHub Release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c   # v8.0.1
+        with:
+          name: packages
+          path: artifacts
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68   # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      # 临时 key 只有 1 小时，紧贴 push 再申请
+      - name: NuGet login (OIDC → temp API key)
+        id: login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841   # v1.2.0
+        with:
+          user: ${{ vars.NUGET_USER || 'Andy_Zhong' }}   # nuget.org 用户名（不是邮箱），可用仓库变量 NUGET_USER 覆盖
+      - name: Push to nuget.org
+        run: >-
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+      # npm Trusted Publishing 要 npm ≥ 11.5.1，Node 22 自带的 npm 不够，这一步用 Node 24。
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020   # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      # 发 verify 打好的 tgz：解开后从目录发布（官方文档写明的形态），--ignore-scripts 跳过 prepack，
+      # 这里没有源码和依赖，也不该再构建一次。公开仓库 + 公开包，provenance 由 npm 自动生成。
+      # 该版本已在 npm 上就跳过，job 重跑不会卡在「不能覆盖已发布版本」。
+      - name: Publish to npm
+        run: |
+          ver="${{ needs.verify.outputs.version }}"
+          npm_ver=$(npm --version)
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)" "$npm_ver" \
+            || { echo "::error::npm trusted publishing needs npm >= 11.5.1, got $npm_ver"; exit 1; }
+          if [ "$(npm view "smart-admin-web@$ver" version 2>/dev/null)" = "$ver" ]; then
+            echo "smart-admin-web@$ver is already on npm; skipping"
+            exit 0
+          fi
+          mkdir npm-publish
+          tar -xzf "artifacts/smart-admin-web-$ver.tgz" -C npm-publish
+          npm publish ./npm-publish/package --ignore-scripts
+      - name: Release notes from CHANGELOG
+        run: |
+          ver="${{ needs.verify.outputs.version }}"
+          awk -v ver="$ver" '$0 ~ ("^## " ver " - ") { f = 1; next } /^## / { if (f) exit } f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "见 CHANGELOG.md。" > notes.md
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64   # v3.0.3
+        with:
+          name: v${{ needs.verify.outputs.version }}
+          body_path: notes.md
+          files: |
+            artifacts/*.nupkg
+            artifacts/*.tgz
+            artifacts/openapi.json

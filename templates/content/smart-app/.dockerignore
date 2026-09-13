@@ -1,0 +1,25 @@
+# Dockerfile 里是 `COPY . .`,所以这份清单先是**安全**、其次才是镜像大小和构建速度。
+#
+# data/ 里有开发期自动生成的 JWT 签名密钥(dev-jwt.key)和 SQLite 库。多阶段构建的最终镜像里
+# 没有它们,但构建阶段那层有——一旦导出构建缓存或推带缓存的镜像,密钥就跟着出去了。
+data/
+*.db
+*.db-journal
+**/appsettings.Development.json
+.env
+.env.local
+
+# 构建产物
+bin/
+obj/
+Tests/bin/
+Tests/obj/
+
+# 按 README 把前端模板 degit 到 web/ 之后,不排除的话每次 docker build 都要把
+# 几百 MB 的 node_modules 传给 daemon —— 而后端镜像一个字节都用不上。
+web/
+node_modules/
+dist/
+
+.git/
+.vs/

@@ -1,0 +1,26 @@
+### SmartAdmin 示例宿主 —— 匿名端点(不需要令牌)
+# 五分钟跑通的第一站:这几条都不用登录。全绿就说明宿主起来了、表建好了、种子跑过了。
+# 用法见同目录 README.md。
+
+@host = http://localhost:5100
+
+### 存活探针 —— 只报进程活着,不碰数据库(编排层 liveness 用)
+GET {{host}}/health
+
+### 就绪探针 —— 真去探数据库和缓存,任一红就 503
+# 正文按项列出状态与耗时:红的时候要能一眼看出是 db 还是 cache,而不是只有一个 Unhealthy
+GET {{host}}/health/ready
+
+### 错误码目录 —— 统一信封里的 code 是数字,这张表给出枚举名和前端 i18n 键
+# 匿名是刻意的:要它的场合(登录页翻译失败原因、外部集成方对码)多半还没有令牌
+GET {{host}}/api/v1/meta/error-codes
+
+### 站点信息 —— 登录页展示用的配置白名单(标题/logo/是否开验证码),不暴露任意配置
+GET {{host}}/api/v1/sys/config/site
+
+### OpenAPI 契约 —— 只在开发环境暴露;前端 npm run gen:api 拉的就是它
+GET {{host}}/openapi/v1.json
+
+### 不带令牌打受保护端点 —— 预期 401 + code 40006
+# 验的是"默认拒绝":漏挂权限特性的端点也不会静默公开
+GET {{host}}/api/v1/ping

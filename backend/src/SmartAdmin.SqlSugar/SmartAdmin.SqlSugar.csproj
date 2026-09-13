@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>SmartAdmin 数据层:SqlSugar 单实例 + CodeFirst 建表 + 幂等种子 + 审计/软删/数据范围全局过滤器 + 开放泛型仓储。</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SmartAdmin.Core\SmartAdmin.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 只为单测 SchemaChangeDetector(内部类,不进公共面) -->
+    <InternalsVisibleTo Include="SmartAdmin.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SqlSugarCore" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- 直接引用抬版,盖过 MDS 传递的有漏洞 SQLitePCLRaw(NU1903);用户装本包即得修补后的 e_sqlite3 -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+</Project>

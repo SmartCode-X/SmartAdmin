@@ -1,0 +1,47 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- 发布包携带 XML 注释(项目注释详尽,是包价值的一部分);面向消费者的公共 API 是否写全靠评审把关,
+         自解释的 DTO 字段等可以省,编译器不做强制 -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- ── NuGet 包元数据(所有包共享)。默认不打包,src 各包显式开 IsPackable ── -->
+    <IsPackable>false</IsPackable>
+    <Version>10.0.0</Version>
+    <Authors>SmartCodeX</Authors>
+    <Company>SmartCodeX</Company>
+    <Product>SmartAdmin</Product>
+    <Copyright>Copyright © SmartCodeX</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/SmartCode-X/SmartAdmin</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SmartCode-X/SmartAdmin</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>smart-icon.png</PackageIcon>
+    <PackageTags>admin;rbac;sqlsugar;aspnetcore;scaffold;kernel</PackageTags>
+    <!-- 指向 CHANGELOG,不在这里写死某个版本的说明:版本号由 tag 经 -p:Version 覆盖,而这段文字不会 ——
+         写死就意味着发新版本时包说明页上仍挂着上一版的内容,且没有任何东西会提醒你。 -->
+    <PackageReleaseNotes>更新日志:https://github.com/SmartCode-X/SmartAdmin/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- ── 可调试性:内核是给人继承和重写的,消费者步不进源码就没法判断该重写哪一步 ──
+         SourceLink 由 .NET SDK 内置(不引第三方包);符号走 snupkg,与 nupkg 同名一并推送。
+         ContinuousIntegrationBuild 只在 CI 开:它把源码路径规范化,本地开着会打乱调试路径。 -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- 每个打包项目都带仓库根 README 作包说明页 + 包图标;非打包项目此 None 为空操作。
+       图标源是 web/template/public/smart-logo.svg（web/template/public/icon-512.png 缩放） —— NuGet 只认 png/jpg,故这里放光栅化后的副本。 -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)smart-icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+</Project>

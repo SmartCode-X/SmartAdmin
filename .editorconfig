@@ -1,0 +1,27 @@
+# 编辑器基线。只写两件事：C# 四格、前端两格，跟仓库里现成的代码一致。
+# 不在这里配 .NET 分析器规则——那属于构建产物的判定，归 Directory.Build.props；
+# 这份文件只管打开文件时光标落在哪一列。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# 前端与文档站：Prettier 的默认缩进是 2，写 4 会跟 npm run format:check 打架。
+[*.{ts,tsx,js,jsx,mjs,cjs,vue,css,scss,json,jsonc,yml,yaml,html}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+# Markdown 行尾两个空格是硬换行，删了会改变渲染结果
+trim_trailing_whitespace = false
+
+[*.{ps1,psm1}]
+indent_size = 4
+
+[Makefile]
+indent_style = tab

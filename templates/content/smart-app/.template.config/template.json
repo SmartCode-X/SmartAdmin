@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "SmartCodeX",
+  "classifications": [ "Web", "Admin", "API", "SmartAdmin" ],
+  "identity": "SmartAdmin.App.CSharp",
+  "name": "SmartAdmin 后台 host",
+  "description": "可运行的 SmartAdmin 消费方后台 host,预接线一个机构隔离示例业务模块(Modules/SampleDoc*),开箱即跑。",
+  "shortName": "smart-app",
+  "sourceName": "SmartApp",
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "primaryOutputs": [
+    { "path": "SmartApp.csproj" }
+  ],
+  "symbols": {
+    "SmartPkgVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "defaultValue": "PACK_VERSION_STAMP",
+      "replaces": "SMART_PKG_VERSION",
+      "description": "生成物引用的 SmartAdmin NuGet 包版本。默认值由打包时的 -p:Version 盖进来(见 SmartAdmin.Templates.csproj 的 StampTemplateVersion),因此始终与随同发布的内核版本一致;直接从源码目录安装模板时它仍是字面量 PACK_VERSION_STAMP —— 那种用法请显式传 --SmartPkgVersion。"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "为 true 时跳过创建后自动 dotnet restore。"
+    }
+  },
+  "postActions": [
+    {
+      "condition": "(!skipRestore)",
+      "description": "还原 NuGet 依赖",
+      "manualInstructions": [ { "text": "在项目目录运行 dotnet restore" } ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+import { defineStore } from 'pinia'
+import type { RouteLocationNormalized } from 'vue-router'
+import { router } from '#/router'
+import { useAuthStore } from '#/stores/auth'
+
+export interface TabItem {
+  path: string // 主键(与 keep-alive 单实例一致)
+  fullPath: string // 最后一次访问的完整 URL(含 query),点击标签时导航到此
+  title: string // 原始 meta.title(可能是 i18n key)
+  name: string // 路由名 → keep-alive include
+  icon?: string
+  affix?: boolean // 固定标签(= 当前应用的首页),不可关闭
+  pinned?: boolean // 用户手动固定(右键「固定」);与 affix 同样不可关闭,但可取消固定
+  titleFixed?: boolean // setTitle 置真:动态标题(如记录名),addTab 复访不再用 meta.title 覆盖
+  noCache?: boolean // meta.noCache:排除出 keep-alive(详情等瞬时页,复访本就该拉新数据)
+}
+
+/**
+ * 多标签页会话:标签列表 + keep-alive 缓存名。sessionStorage 持久化(F5 恢复,新标签页从净态开始)。
+ * 首页标签不写死:每个应用首页不同(homePath()),故 affix 在 addTab 时按当前应用判定。
+ */
+export const useTabsStore = defineStore('tabs', {
+  state: () => ({
+    tabs: [] as TabItem[],
+    reloadKey: 0, // 变更 → 强制页面重挂(refreshTab)
+    excludeName: '', // 临时逐出 keep-alive 实例(refreshTab)
+  }),
+  getters: {
+    // 供 keep-alive :include。noCache 标签(详情等瞬时页)排除出缓存;再剪掉 F5 重建期失效的名。
+    cachedNames(state): string[] {
+      return state.tabs
+        .filter(t => !t.noCache)
+        .map(t => t.name)
+        .filter(n => router.hasRoute(n))
+    },
+  },
+  actions: {
+    addTab(route: RouteLocationNormalized) {
+      const name = String(route.name ?? '')
+      if (!name) return
+      const path = route.path
+      const title = (route.meta.title as string) || name || path
+      const icon = route.meta.icon as string | undefined
+      const existing = this.tabs.find(t => t.path === path)
+      if (existing) {
+        existing.fullPath = route.fullPath
+        if (!existing.titleFixed) existing.title = title // 动态标题(setTitle 设过)不被 meta.title 复访覆盖
+        if (icon) existing.icon = icon
+      } else {
+        // 当前应用的首页 → 固定标签,不可关闭(每个应用各有一个)
+        this.tabs.push({
+          path,
+          fullPath: route.fullPath,
+          title,
+          name,
+          icon,
+          affix: path === useAuthStore().homePath,
+          noCache: route.meta.noCache === true, // 详情等瞬时页不进 keep-alive
+        })
+      }
+    },
+    removeTab(path: string) {
+      const idx = this.tabs.findIndex(t => t.path === path)
+      if (idx === -1 || this.tabs[idx]!.affix || this.tabs[idx]!.pinned) return
+      const wasActive = router.currentRoute.value.path === path
+      this.tabs.splice(idx, 1)
+      if (wasActive) {
+        const next = this.tabs[idx] ?? this.tabs[idx - 1] ?? this.tabs[0]!
+        router.push(next.fullPath)
+      }
+    },
+    closeOthers(path: string) {
+      this.tabs = this.tabs.filter(t => t.affix || t.pinned || t.path === path)
+      this._ensureActive(path)
+    },
+    closeAll() {
+      this.tabs = this.tabs.filter(t => t.affix || t.pinned)
+      this._ensureActive(useAuthStore().homePath)
+    },
+    closeLeft(path: string) {
+      const idx = this.tabs.findIndex(t => t.path === path)
+      if (idx <= 0) return
+      this.tabs = this.tabs.filter((t, i) => t.affix || t.pinned || i >= idx)
+      this._ensureActive(path)
+    },
+    closeRight(path: string) {
+      const idx = this.tabs.findIndex(t => t.path === path)
+      if (idx === -1) return
+      this.tabs = this.tabs.filter((t, i) => t.affix || t.pinned || i <= idx)
+      this._ensureActive(path)
+    },
+    // 用户手动固定/取消固定(右键菜单);应用首页 affix 恒固定,不受此影响。
+    togglePin(path: string) {
+      const tab = this.tabs.find(t => t.path === path)
+      if (tab && !tab.affix) tab.pinned = !tab.pinned
+    },
+    // 当前激活标签被批量关闭后,导航到 preferPath(通常是右键的那个)或末尾标签。
+    _ensureActive(preferPath: string) {
+      const cur = router.currentRoute.value.path
+      if (this.tabs.some(t => t.path === cur)) return
+      const target = this.tabs.find(t => t.path === preferPath) ?? this.tabs[this.tabs.length - 1]
+      if (target) router.push(target.fullPath)
+    },
+    // 逐出缓存实例并发信号;default.vue 监听 reloadKey 做 v-if 重挂,重挂后清 excludeName。
+    refreshTab(name: string) {
+      this.excludeName = name
+      this.reloadKey++
+    },
+    // 详情页数据加载后设置动态标签标题(如记录名);titleFixed 防 addTab 复访用 meta.title 覆盖回去。
+    setTitle(path: string, title: string) {
+      const tab = this.tabs.find(t => t.path === path)
+      if (!tab) return
+      tab.title = title
+      tab.titleFixed = true
+    },
+    // 切应用/登出:标签清空。新应用首页由 router.afterEach 的 addTab 自然补成第一个(affix)标签。
+    clearTabs() {
+      this.tabs = []
+    },
+  },
+  persist: { storage: sessionStorage, pick: ['tabs'] },
+})
