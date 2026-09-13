@@ -38,10 +38,10 @@
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
-  <!-- 每个打包项目都带仓库根 README 作包说明页 + 包图标;非打包项目此 None 为空操作。
+  <!-- 每个打包项目都带包图标 + 由仓库根 README 生成的包说明页(PackageReadme.targets);非打包项目此 None 为空操作。
        图标源是 web/template/public/smart-logo.svg（web/template/public/icon-512.png 缩放） —— NuGet 只认 png/jpg,故这里放光栅化后的副本。 -->
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="$(MSBuildThisFileDirectory)smart-icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
+  <Import Project="$(MSBuildThisFileDirectory)PackageReadme.targets" />
 </Project>

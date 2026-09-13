@@ -44,11 +44,12 @@
          少写一层,盖过版本的 template.json 就落到另一个空模板根下 —— dotnet new 照样"成功",但一个文件都不生成。 -->
     <Content Include="content\**\*" Exclude="content\**\bin\**;content\**\obj\**;content\**\.template.config\template.json" />
     <Content Include="$(_TemplateJsonStamped)" PackagePath="content\content\smart-app\.template.config\template.json" />
-    <!-- 图标 + 说明页放包根(PackagePath="\"),供 nuget.org 页面用;Pack=true 打进包但不参与 dotnet new。 -->
+    <!-- 图标 + 说明页放包根(PackagePath="\"),供 nuget.org 页面用;Pack=true 打进包但不参与 dotnet new。
+         说明页与核心包同一份生成逻辑,见下面导入的 PackageReadme.targets。 -->
     <None Include="$(MSBuildThisFileDirectory)..\backend\smart-icon.png" Pack="true" PackagePath="\" Visible="false" />
-    <None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <Compile Remove="**\*" />
   </ItemGroup>
+  <Import Project="$(MSBuildThisFileDirectory)..\backend\PackageReadme.targets" />
 
   <!-- 把打包版本盖进模板的 SmartPkgVersion 默认值。
        没有这一步,模板就带着一个写死的版本发出去 —— 而 PackageReference 的 Version 是**最低版本**,

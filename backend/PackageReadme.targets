@@ -1,0 +1,19 @@
+<Project>
+  <!-- 包说明页由仓库根 README 生成,backend/Directory.Build.props 与模板包 templates/SmartAdmin.Templates.csproj 共用这一份。
+       README 顶部的居中排版靠 <div align="center"> 和 <img> 在 GitHub 上实现;nuget.org 不渲染 HTML,会把这几行原样显示成文字,
+       所以打包前删掉顶格的 <div>、</div>、<img> 整行,其余一字不动:包页上是同一份 README 的左对齐版,标题、徽章、链接都在。 -->
+  <ItemGroup>
+    <None Include="$(BaseIntermediateOutputPath)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="GeneratePackageReadme" BeforeTargets="GenerateNuspec" Condition="'$(IsPackable)' == 'true'">
+    <PropertyGroup>
+      <_PackageReadmeText>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\README.md'))</_PackageReadmeText>
+      <_PackageReadmeText>$([System.Text.RegularExpressions.Regex]::Replace($(_PackageReadmeText), '(?m)^&lt;(/?div|img)\b[^\n]*\n', ''))</_PackageReadmeText>
+    </PropertyGroup>
+    <MakeDir Directories="$(BaseIntermediateOutputPath)" />
+    <!-- Escape:MSBuild 会把 Lines 当 item 列表按 ';' 切分,README 代码示例里的分号会被劈成换行。 -->
+    <WriteLinesToFile File="$(BaseIntermediateOutputPath)README.md" Lines="$([MSBuild]::Escape($(_PackageReadmeText)))"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+</Project>
