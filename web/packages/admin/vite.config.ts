@@ -51,5 +51,8 @@ export default defineConfig({
     pool: 'forks',
     restoreMocks: true,
     unstubGlobals: true,
+    // 这几个依赖在自己的入口里 import CSS,Node 直接加载会报 Unknown file extension ".css";交给 Vite 转换。
+    // import 整个包入口的用例(src/index.spec.ts)需要它。
+    server: { deps: { inline: ['smart-naive-table', 'smart-naive-icon', 'md-editor-v3'] } },
   },
 })

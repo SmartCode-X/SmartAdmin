@@ -29,8 +29,8 @@ export {
 } from './api/client'
 export type { paths as KernelPaths, components as KernelComponents } from './api/schema'
 
-// 类型
-export type * from './types/api'
+// 类型与枚举:枚举是值(ImportWizard 的 strategies 等要传 DuplicateStrategy.Skip 这类成员),不能只以 export type 导出
+export * from './types/api'
 export * from './types/menu'
 
 // Stores
