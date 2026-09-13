@@ -17,6 +17,7 @@
 ### Fixed
 
 - **模板装依赖不再提示 esbuild 的安装脚本待批准。** `web/template/package.json` 加上 `"allowScripts": { "esbuild": true }`。degit 出去的模板没有 lockfile，esbuild 的补丁版本会浮动，所以按包名批准、不钉版本；npm 11 对未批准的依赖安装脚本会在 `npm install` 末尾列出警告。
+- **网关子路径部署下，外部登录回调与待绑定认领不再一律 40014。** 两个 binder cookie（`tn_oauth_state`、`tn_oauth_pending`）的 Path 跟随对外路径前缀：配了 `CallbackBaseUrl` 取它的路径部分（`https://gw.example.com/admin` → `/admin/api/v1/auth/external`），没配时（仅开发环境）取 `Request.PathBase`，开发环境回退拼出的回调地址也带上 PathBase。根路径部署不受影响。在网关上改写 cookie Path 的临时绕法（如 nginx `proxy_cookie_path /api/ /admin/api/;`）升级后不再匹配，自然失效，可以删掉。（[#1](https://github.com/SmartCode-X/SmartAdmin/issues/1)）
 
 ## 10.10.0 - 2026-09-13
 

@@ -36,6 +36,7 @@ public class ExternalAuthController(
     private static readonly TimeSpan PENDING_LINK_TTL = TimeSpan.FromMinutes(15); // 未绑定→账密登录后认领窗口
     private const string STATE_COOKIE = "tn_oauth_state";                      // 登录态 binder cookie(防登录 CSRF)
     private const string PENDING_COOKIE = "tn_oauth_pending";                  // pending-link binder(防换浏览器抢绑)
+    private const string ROUTE_PATH = "/api/v1/auth/external";                 // 与类上的 [Route] 一致
 
     private long CurrentUserId => currentUser.UserId ?? throw new AdminException(ErrorCode.TokenInvalid);
 
@@ -103,7 +104,7 @@ public class ExternalAuthController(
         if (st.Mode != "bind")
         {
             var binder = Request.Cookies[STATE_COOKIE];
-            Response.Cookies.Delete(STATE_COOKIE, new CookieOptions { Path = "/api/v1/auth/external" });
+            Response.Cookies.Delete(STATE_COOKIE, new CookieOptions { Path = BinderCookiePath });
             if (string.IsNullOrEmpty(binder) || !FixedTimeEquals(binder, st.Binder))
                 return Redirect(FrontendResultUrl($"error={(int)ErrorCode.OAuthStateInvalid}"));
         }
@@ -206,7 +207,7 @@ public class ExternalAuthController(
         var payload = await cache.GetAndRemoveAsync<ExternalPendingLinkPayload>(key, cancellationToken);
         if (payload is null || string.IsNullOrEmpty(payload.Provider) || string.IsNullOrEmpty(payload.Subject))
             throw new AdminException(ErrorCode.OAuthStateInvalid);
-        Response.Cookies.Delete(PENDING_COOKIE, new CookieOptions { Path = "/api/v1/auth/external" });
+        Response.Cookies.Delete(PENDING_COOKIE, new CookieOptions { Path = BinderCookiePath });
 
         // 运营可能在窗口内关掉该 provider:与 bind 回调一致,fail-closed
         await ResolveEnabledProviderAsync(payload.Provider);
@@ -288,7 +289,7 @@ public class ExternalAuthController(
                 Secure = Request.IsHttps,        // 生产 https 加 Secure;dev http(localhost)放行,否则本地登不了
                 SameSite = SameSiteMode.Lax,     // Lax:放行 IdP 跨站顶层导航回调携带(Strict 会拦掉 → 登录必失败)
                 MaxAge = STATE_TTL,
-                Path = "/api/v1/auth/external",
+                Path = BinderCookiePath,
             });
         }
 
@@ -332,10 +333,26 @@ public class ExternalAuthController(
                 throw new InvalidOperationException(
                     "外部登录已启用,但生产环境未配置 SmartAdmin:ExternalAuth:CallbackBaseUrl。" +
                     "回调基址(redirect_uri 来源)必须是稳定的后端公网地址,不能从请求 Host 头推断(可伪造)。");
-            return $"{Request.Scheme}://{Request.Host}/api/v1/auth/external/{provider}/callback";
+            return $"{Request.Scheme}://{Request.Host}{ExternalPathBase()}{ROUTE_PATH}/{provider}/callback";
         }
-        return $"{options.CallbackBaseUrl!.TrimEnd('/')}/api/v1/auth/external/{provider}/callback";
+        return $"{options.CallbackBaseUrl!.TrimEnd('/')}{ROUTE_PATH}/{provider}/callback";
     }
+
+    /// <summary>
+    /// 浏览器眼中本应用的路径前缀:配了 <c>CallbackBaseUrl</c> 取它的路径部分(网关子路径部署,
+    /// 如 https://gw.example.com/admin → /admin),没配时(仅开发环境)取 <c>Request.PathBase</c>(UsePathBase、IIS 子应用)。
+    /// 回调地址与两个 binder cookie 的 Path 都由它拼出,三者始终一致。
+    /// </summary>
+    protected virtual string ExternalPathBase() =>
+        Uri.TryCreate(options.CallbackBaseUrl, UriKind.Absolute, out var baseUri)
+            ? baseUri.AbsolutePath.TrimEnd('/')
+            : Request.PathBase.ToUriComponent();
+
+    /// <summary>
+    /// 两个 binder cookie 的 Path:对外前缀 + 本控制器路由,限定只随外部登录的请求发出。浏览器按 RFC 6265 做路径前缀匹配,
+    /// 少了前缀,网关子路径部署下回调与认领都拿不到 cookie,一律 40014。
+    /// </summary>
+    private string BinderCookiePath => $"{ExternalPathBase()}{ROUTE_PATH}";
 
     /// <summary>前端结果页 URL(相对路径=同源部署,绝对 URL=前后端分离 dev);追加查询参数。</summary>
     protected virtual string FrontendResultUrl(string query)
@@ -345,14 +362,14 @@ public class ExternalAuthController(
         return $"{basePath}{sep}{query}";
     }
 
-    /// <summary>pending-link binder cookie:仅本浏览器 claim 时携带;Path 与 API 前缀对齐。</summary>
+    /// <summary>pending-link binder cookie:仅本浏览器 claim 时携带;Path 见 <see cref="BinderCookiePath"/>。</summary>
     private CookieOptions PendingCookieOptions() => new()
     {
         HttpOnly = true,
         Secure = Request.IsHttps,
         SameSite = SameSiteMode.Lax,
         MaxAge = PENDING_LINK_TTL,
-        Path = "/api/v1/auth/external",
+        Path = BinderCookiePath,
     };
 
     /// <summary>256 位加密随机 → base64url(nonce/PKCE verifier/票据/binder 通用)。</summary>
