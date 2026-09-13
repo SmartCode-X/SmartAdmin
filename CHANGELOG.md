@@ -12,6 +12,12 @@
 
 > **发了什么，以本文件为准**，而不是仓库的发行版页面：那里只是可选的镜像，内容从本文件对应版本的段落复制过去。
 
+## Unreleased
+
+### Fixed
+
+- **模板装依赖不再提示 esbuild 的安装脚本待批准。** `web/template/package.json` 加上 `"allowScripts": { "esbuild": true }`。degit 出去的模板没有 lockfile，esbuild 的补丁版本会浮动，所以按包名批准、不钉版本；npm 11 对未批准的依赖安装脚本会在 `npm install` 末尾列出警告。
+
 ## 10.10.0 - 2026-09-13
 
 后端 13 个 NuGet 包、前端 npm 包 `smart-admin-web` 与项目模板同号发布。能力清单见 [`README.md`](https://github.com/SmartCode-X/SmartAdmin/blob/main/README.md) 的「内置功能」，接入与扩展见[文档站](https://smartcode-x.github.io/SmartAdmin/zh/)。
