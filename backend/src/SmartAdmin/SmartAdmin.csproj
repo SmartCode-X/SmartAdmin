@@ -2,7 +2,7 @@
   <!-- 元包:用户只装这一个,一键引全部。目前 = 引 AspNetCore(传递引 Services→SqlSugar→Core) -->
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>SmartAdmin 元包:装这一个即引入全部内核(AspNetCore + Services + SqlSugar + Core)。可替换的企业后台内核,装上即用,升级只改版本号。</Description>
+    <Description>SmartAdmin 元包:装这一个即引入全部内核(AspNetCore + Services + SqlSugar + Core)。可替换的现代企业后台管理内核,AI 辅助开发,简单高效;装上即用,升级只改版本号。</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SmartAdmin.AspNetCore\SmartAdmin.AspNetCore.csproj" />

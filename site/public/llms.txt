@@ -81,7 +81,7 @@ The docs are bilingual. English lives at the root path and is a translation; Sim
 - [Agent Skills and AI-Assisted Development](https://smartcode-x.github.io/SmartAdmin/community/agent-skills)
 - [Upgrading to a New Release](https://smartcode-x.github.io/SmartAdmin/guide/upgrade)
 - [Changelog](https://smartcode-x.github.io/SmartAdmin/changelog)
-- [The replaceable admin kernel for .NET](https://smartcode-x.github.io/SmartAdmin/)
+- [The replaceable, modern admin kernel for .NET](https://smartcode-x.github.io/SmartAdmin/)
 
 ## 简体中文 (Chinese, source language)
 
@@ -132,7 +132,7 @@ The docs are bilingual. English lives at the root path and is a translation; Sim
 - [贡献指南](https://smartcode-x.github.io/SmartAdmin/zh/community/contributing)
 - [Agent Skills 与 AI 辅助开发](https://smartcode-x.github.io/SmartAdmin/zh/community/agent-skills)
 - [更新日志](https://smartcode-x.github.io/SmartAdmin/zh/changelog)
-- [可替换的企业后台内核](https://smartcode-x.github.io/SmartAdmin/zh/)
+- [可替换的现代企业后台管理内核](https://smartcode-x.github.io/SmartAdmin/zh/)
 
 ## Not on this site
 

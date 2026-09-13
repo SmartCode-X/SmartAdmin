@@ -415,14 +415,14 @@ export default defineConfig({
     root: {
       label: 'English',
       lang: 'en',
-      description: 'The replaceable admin kernel for .NET: install and go, upgrade by bumping a version.',
+      description: 'The replaceable, modern admin kernel for .NET: simple, efficient, AI-assisted development. Install and go, upgrade by bumping a version.',
       themeConfig: enThemeConfig,
     },
     zh: {
       label: '简体中文',
       lang: 'zh-CN',
       link: '/zh/',
-      description: '可替换的企业后台内核：装上即用，升级只改版本号。',
+      description: '可替换的现代企业后台管理内核：AI 辅助开发，简单高效；装上即用，升级只改版本号。',
       themeConfig: zhThemeConfig,
     },
   },
