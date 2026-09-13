@@ -36,6 +36,7 @@ dev server 起在 `5173`，`/api`、`/openapi`、`/hub` 反代到后端 `:5100`�
 | `src/api/client.ts` | 本应用的类型化客户端。模板里是 `createApiClient<KernelPaths>()`，第一次 `gen:api` 之后换成自己的 `paths` |
 | `src/views/` | 自己的页面 |
 | `src/locales/ext/` | 自己的文案，按 `<locale>/<模块>.ts` 放 |
+| `src/assets/icons/ph-subset.json` | 本应用用到的 `ph` 图标子集，`npm run gen:icons` 生成 |
 | `scripts/gen-api.mjs` | `npm run gen:api` 的实现，从跑着的后端生成 `src/api/schema.d.ts` |
 | `vite.config.ts` | dev 代理与构建分包 |
 | `public/` | favicon 与 Logo 这类静态文件 |
@@ -49,17 +50,19 @@ dev server 起在 `5173`，`/api`、`/openapi`、`/hub` 反代到后端 `:5100`�
 ```ts
 import { createSmartAdmin } from 'smart-admin-web'
 import 'smart-admin-web/style.css'
+import phSubset from './assets/icons/ph-subset.json'
 
 createSmartAdmin({
   views: import.meta.glob('./views/**/*.vue'),
   locales: import.meta.glob('./locales/ext/*/*.ts', { eager: true }),
+  iconSets: [phSubset],
   apiBase: import.meta.env.VITE_API_BASE,
   dev: import.meta.env.DEV,
   version: __APP_VERSION__,
 }).mount('#app')
 ```
 
-页面 key 是 `views/` 之后去掉 `.vue` 的路径。`src/views/sample/doc/index.vue` 的 key 就是 `sample/doc/index`，菜单管理里的「组件路径」填的正是它；和内置页同名，就覆盖内置页。`<模块>/detail.vue` 按约定成为详情路由 `/<模块>/:id/detail`。其余选项按需加：
+页面 key 是 `views/` 之后去掉 `.vue` 的路径。`src/views/sample/doc/index.vue` 的 key 就是 `sample/doc/index`，菜单管理里的「组件路径」填的正是它；和内置页同名，就覆盖内置页。`<模块>/detail.vue` 按约定成为详情路由 `/<模块>/:id/detail`。`iconSets` 接的是本应用的 `ph` 图标子集，页面里用了新的 `ph:*` 名字就跑一次 `npm run gen:icons`，原理见[主题与图标](/zh/frontend/appearance)。其余选项按需加：
 
 | 选项 | 用途 |
 |---|---|

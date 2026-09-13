@@ -19,7 +19,7 @@
 | 前端 i18n | 追加进 `web/packages/admin/src/locales/zh-CN.ts` + `en-US.ts` | **新建** `src/locales/ext/zh-CN/<模块>.ts` + `ext/en-US/<模块>.ts`(`createSmartAdmin({ locales })` 深合并,无需注册) |
 | 前端页面 | `web/packages/admin/src/views/<模块>/`(包内自动登记) | `src/views/<模块>/`(`createSmartAdmin({ views })` 登记;与内置页同 key 即覆盖内置页) |
 
-> 前端这三行和后端同一个道理:内核以包交付,业务代码不进内核。应用里没有内核源码,扩展只走 `createSmartAdmin` 的选项(`views` / `locales` / `routes` / `menuTitles` / `icons` / `install` / `plugins`)和包的公开导出(`web/packages/admin/src/index.ts`);内核组件、composable、store、工具一律 `import { … } from 'smart-admin-web'`。
+> 前端这三行和后端同一个道理:内核以包交付,业务代码不进内核。应用里没有内核源码,扩展只走 `createSmartAdmin` 的选项(`views` / `locales` / `routes` / `menuTitles` / `icons` / `iconSets` / `install` / `plugins`)和包的公开导出(`web/packages/admin/src/index.ts`);内核组件、composable、store、工具一律 `import { … } from 'smart-admin-web'`。
 
 ## 步骤
 

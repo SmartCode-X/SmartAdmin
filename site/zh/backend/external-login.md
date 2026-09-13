@@ -42,7 +42,7 @@ builder.Services.AddSmartAdmin(builder.Configuration);
 }
 ```
 
-`CallbackBaseUrl` 只填后端对外的根地址，回调路径 `/api/v1/auth/external/{provider}/callback` 由内核接在后面。开发环境不配会回退到请求主机；生产环境必须配，因为 Host 头能伪造。填错了厂商照样跳转，它们只校验域名，最后落在一条不存在的路径上，看着就是「授权完什么也没发生」。所以启动时先校验：整条回调地址、前端结果页 `FrontendResultPath`、带查询串或 `#` 片段、不是 `http(s)` 绝对地址，都会让应用拒绝启动。网关子路径可以，比如 `https://gw.example.com/admin`。
+`CallbackBaseUrl` 只填后端对外的根地址，回调路径 `/api/v1/auth/external/{provider}/callback` 由内核接在后面。开发环境不配会回退到请求主机；生产环境必须配，因为 Host 头能伪造。填错了厂商照样跳转，它们只校验域名，最后落在一条不存在的路径上，看着就是「授权完什么也没发生」。所以启动时先校验：整条回调地址、前端结果页 `FrontendResultPath`、带查询串或 `#` 片段、不是 `http(s)` 绝对地址，都会让应用拒绝启动。网关子路径可以，比如 `https://gw.example.com/admin`。这时前端的 `apiBase` 也要走同一个前缀。内核靠两个 cookie 确认回调与认领来自发起登录的那个浏览器，cookie 的 Path 跟着前缀走（`/admin/api/v1/auth/external`）。前端绕开前缀调接口，cookie 就带不上，登录回调或认领待绑定会报 40014。
 
 `GET /api/v1/auth/external/providers` 只回非密钥字段（code、显示名、图标），够前端点亮按钮就行。
 

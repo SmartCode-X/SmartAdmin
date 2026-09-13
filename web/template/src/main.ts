@@ -1,5 +1,6 @@
 import { createSmartAdmin } from 'smart-admin-web'
 import 'smart-admin-web/style.css'
+import phSubset from './assets/icons/ph-subset.json'
 
 // 页面 key 规则:views 用 import.meta.glob('./views/**/*.vue') 采集,key 取 /views/ 之后去掉 .vue
 // 的相对路径(如 system/user/index),菜单管理里的「组件路径」按同一规则填;与内核内置页同名即覆盖。
@@ -9,6 +10,8 @@ import 'smart-admin-web/style.css'
 createSmartAdmin({
   views: import.meta.glob('./views/**/*.vue'),
   locales: import.meta.glob('./locales/ext/*/*.ts', { eager: true }),
+  // 本应用用到的 ph 图标子集,启动时同步注册;页面里用了新的 ph:* 名字就跑 npm run gen:icons 重生成
+  iconSets: [phSubset],
   apiBase: import.meta.env.VITE_API_BASE,
   dev: import.meta.env.DEV,
   version: __APP_VERSION__,

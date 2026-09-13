@@ -24,7 +24,7 @@ SmartAdmin 是**可分发的后台内核**,不是一个应用。后端以 NuGet 
 
 - 包的公开 API 就是 `web/packages/admin/src/index.ts`:应用只能 `import { X } from 'smart-admin-web'`,改导出签名即破坏性变更。包内别名是 `#/` → `src/`,**包里不写 `@/`**(到了应用里它指应用自己的 `src`)。
 - 持有全局单例的依赖(vue、vue-router、pinia、vue-i18n、naive-ui、@vueuse/core、@iconify/vue、smart-naive-table、smart-naive-icon)是 peerDependencies,由应用装、只有一份。
-- 应用经 `createSmartAdmin({ views, locales, routes, menuTitles, icons, install, plugins, ... })` 扩展内核,覆盖顺序 内核 < 插件 < 应用;页面 key 是 `views/` 之后去掉 `.vue` 的路径,即菜单的 `component` 字段。
+- 应用经 `createSmartAdmin({ views, locales, routes, menuTitles, icons, iconSets, install, plugins, ... })` 扩展内核,覆盖顺序 内核 < 插件 < 应用;页面 key 是 `views/` 之后去掉 `.vue` 的路径,即菜单的 `component` 字段。
 - `web/packages/admin/src/api/schema.d.ts` 是从跑着的后端 `/openapi/v1.json` 生成的,**不要手改**,跑 `npm run gen:api`。
 - 写页面前先读 `web/COMPONENTS.md`(SmartTable、FormContainer、useConfirm、字典套件、图标)。加了共享组件要回头更新它,并从 `index.ts` 导出。
 - 菜单树是登录后从后端拉的动态路由,不写在 `router/routes.ts` 里。

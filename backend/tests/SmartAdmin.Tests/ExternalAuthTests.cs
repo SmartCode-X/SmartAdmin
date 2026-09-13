@@ -501,6 +501,112 @@ public class ExternalAuthTests
         Assert.Contains("FrontendResultPath", ex.Message);
     }
 
+    [Theory]
+    [InlineData(null, "/api/v1/auth/external")]                                  // 开发环境不配,取 PathBase(此处为空)
+    [InlineData("https://admin.example.com", "/api/v1/auth/external")]
+    [InlineData("https://gw.example.com/admin/", "/admin/api/v1/auth/external")]  // 网关子路径,尾斜杠不计
+    public async Task Binder_cookie_path_follows_the_external_path_prefix(string? callbackBaseUrl, string expectedPath)
+    {
+        using var f = new AdminAppFactory
+        {
+            Settings = callbackBaseUrl is null ? null : new Dictionary<string, string?>
+            {
+                ["SmartAdmin:ExternalAuth:CallbackBaseUrl"] = callbackBaseUrl,
+            },
+            Overrides = s => s.AddSingleton<IExternalAuthProvider>(new StateEchoProvider()),
+        };
+        var client = f.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+
+        var resp = await client.GetAsync("/api/v1/auth/external/echo/authorize");
+
+        var cookie = resp.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("tn_oauth_state="));
+        Assert.Contains($"path={expectedPath};", cookie + ";");
+    }
+
+    [Fact]
+    public async Task Gateway_sub_path_login_callback_and_pending_link_claim_receive_their_binder_cookies()
+    {
+        // 网关把 https://gw.example.com/admin/* 剥掉 /admin 再转给后端:后端看到 /api/v1/auth/external/…,
+        // 浏览器看到 /admin/api/v1/auth/external/…。CookieContainer 按路径匹配决定每个请求带哪些 cookie,
+        // 代替浏览器;手工把 Set-Cookie 塞进下一次请求会绕过这一步,测不出 Path 写错。
+        const string GATEWAY = "https://gw.example.com/admin";
+        var identity = new ExternalIdentity("test", "sub-gateway", "Gateway User");
+        using var f = new AdminAppFactory
+        {
+            Settings = new Dictionary<string, string?>
+            {
+                ["SmartAdmin:ExternalAuth:CallbackBaseUrl"] = GATEWAY,
+                ["SmartAdmin:ExternalAuth:FrontendResultPath"] = "/admin/oauth/callback",
+            },
+            Overrides = s => s.AddSingleton<IExternalAuthProvider>(new FakeExternalAuthProvider(identity)),
+        };
+        var client = f.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+        var browser = new CookieContainer();
+
+        // 浏览器经网关请求的地址 → 后端收到的请求(剥掉 /admin),带上浏览器此时会发的 cookie
+        HttpRequestMessage ViaGateway(HttpMethod method, Uri browserUri)
+        {
+            var req = new HttpRequestMessage(method, browserUri.PathAndQuery["/admin".Length..]);
+            var cookieHeader = browser.GetCookieHeader(browserUri);
+            if (cookieHeader.Length > 0) req.Headers.Add("Cookie", cookieHeader);
+            return req;
+        }
+        void Remember(Uri browserUri, HttpResponseMessage resp)
+        {
+            if (resp.Headers.TryGetValues("Set-Cookie", out var values))
+                foreach (var value in values) browser.SetCookies(browserUri, value);
+        }
+
+        // 1) 登录页发起授权
+        var authorizeUri = new Uri($"{GATEWAY}/api/v1/auth/external/test/authorize");
+        var authz = await client.SendAsync(ViaGateway(HttpMethod.Get, authorizeUri));
+        Assert.Equal(HttpStatusCode.Redirect, authz.StatusCode);
+        Remember(authorizeUri, authz);
+        var query = new Uri(authz.Headers.Location!.ToString()).Query.TrimStart('?');
+        var state = Uri.UnescapeDataString(query.Split('&').First(p => p.StartsWith("state="))["state=".Length..]);
+
+        // 2) IdP 回调打在 CallbackBaseUrl 拼出的地址上:binder cookie 必须随行,未绑定身份走 pending-link 而不是 40014
+        var callbackUri = new Uri($"{GATEWAY}/api/v1/auth/external/test/callback?code=c&state={Uri.EscapeDataString(state)}");
+        var cb = await client.SendAsync(ViaGateway(HttpMethod.Get, callbackUri));
+        var loc = cb.Headers.Location!.ToString();
+        Assert.DoesNotContain($"error={(int)ErrorCode.OAuthStateInvalid}", loc);
+        Assert.StartsWith("/admin/oauth/callback?pendingLink=", loc);
+        Remember(callbackUri, cb);
+        var pending = Uri.UnescapeDataString(
+            loc.Split('?')[1].Split('&').First(p => p.StartsWith("pendingLink="))["pendingLink=".Length..]);
+
+        // 3) 账密登录后,前端经 apiBase=/admin 认领:pending binder cookie 必须随行
+        var token = await client.LoginToken("superAdmin", "Test@123456");
+        var claim = ViaGateway(HttpMethod.Post, new Uri($"{GATEWAY}/api/v1/auth/external/pending-link/claim"));
+        claim.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        claim.Content = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(new { pendingLink = pending }), System.Text.Encoding.UTF8, "application/json");
+        var claimEnv = await (await client.SendAsync(claim)).ReadEnvelope();
+        Assert.Equal(0, claimEnv.GetProperty("code").GetInt32());
+
+        using var scope = f.Services.CreateScope();
+        Assert.NotNull(await scope.ServiceProvider.GetRequiredService<ISysUserExternalService>()
+            .FindByExternalAsync("test", "sub-gateway"));
+    }
+
+    [Fact]
+    public async Task Dev_fallback_puts_the_path_base_into_both_the_redirect_uri_and_the_cookie_path()
+    {
+        // 未配 CallbackBaseUrl(仅开发环境):应用挂在 PathBase 下(UsePathBase、IIS 子应用)时,
+        // 回调地址与 cookie Path 都要带上它,否则回调落到前缀之外,cookie 也不随行。
+        var provider = new AuthorizeCapturingProvider();
+        using var f = new AdminAppFactory { Overrides = s => s.AddSingleton<IExternalAuthProvider>(provider) };
+        f.Server.BaseAddress = new Uri("http://localhost/admin/");   // TestServer 把 BaseAddress 的路径当作 PathBase
+        var client = f.Server.CreateClient();                        // 不跟随重定向、不管理 cookie
+
+        var resp = await client.GetAsync("api/v1/auth/external/capture/authorize");
+
+        Assert.Equal(HttpStatusCode.Redirect, resp.StatusCode);
+        Assert.Equal("http://localhost/admin/api/v1/auth/external/capture/callback", provider.Last!.RedirectUri);
+        var cookie = resp.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("tn_oauth_state="));
+        Assert.Contains("path=/admin/api/v1/auth/external;", cookie + ";");
+    }
+
     [Fact]
     public async Task Unbound_login_callback_pending_link_can_be_claimed_after_password_login()
     {

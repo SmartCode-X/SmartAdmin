@@ -14,9 +14,15 @@
 
 ## Unreleased
 
+### Added
+
+- **应用可以生成自己的 `ph` 离线图标子集。** `smart-admin-web` 带上命令 `smart-admin-icons`：扫描应用 `src` 里的 `ph:*` 名字，从 Phosphor 整集裁出这些图标写成 JSON；`--check` 只比对不写盘，产物过期或有拼错的名字时非 0 退出，给 CI 用。`createSmartAdmin` 新增 `iconSets` 选项，启动时把这份子集和内核子集一起同步注册，业务页的 `ph` 图标首帧就能离线渲染，不再懒加载整套 `ph`（约 946 KB gz）。模板已经接好：`npm run gen:icons` 写出 `src/assets/icons/ph-subset.json`，`main.ts` 经 `iconSets` 传入。已有应用照这两处补上即可。应用的子集不剔除内核子集已有的名字，内核升级不会让应用提交的子集过期。（[#3](https://github.com/SmartCode-X/SmartAdmin/issues/3)）
+
 ### Fixed
 
 - **模板装依赖不再提示 esbuild 的安装脚本待批准。** `web/template/package.json` 加上 `"allowScripts": { "esbuild": true }`。degit 出去的模板没有 lockfile，esbuild 的补丁版本会浮动，所以按包名批准、不钉版本；npm 11 对未批准的依赖安装脚本会在 `npm install` 末尾列出警告。
+- **网关子路径部署下，外部登录回调与待绑定认领不再一律 40014。** 两个 binder cookie（`tn_oauth_state`、`tn_oauth_pending`）的 Path 跟随对外路径前缀：配了 `CallbackBaseUrl` 取它的路径部分（`https://gw.example.com/admin` → `/admin/api/v1/auth/external`），没配时（仅开发环境）取 `Request.PathBase`，开发环境回退拼出的回调地址也带上 PathBase。根路径部署不受影响。在网关上改写 cookie Path 的临时绕法（如 nginx `proxy_cookie_path /api/ /admin/api/;`）升级后不再匹配，自然失效，可以删掉。（[#1](https://github.com/SmartCode-X/SmartAdmin/issues/1)）
+- **`smart-admin-web` 的枚举可以当值导入。** 包入口把 `types/api` 整体导出（类型与枚举一起），`DuplicateStrategy`、`DataScopeType`、`NoticeType`、`ReceiverType` 与 `Job*` 系列都能直接用成员值，比如给 `ImportWizard` 传 `:strategies="[DuplicateStrategy.Skip]"`，不必再自己镜像一份数值。（[#2](https://github.com/SmartCode-X/SmartAdmin/issues/2)）
 
 ## 10.10.0 - 2026-09-13
 

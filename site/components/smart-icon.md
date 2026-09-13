@@ -55,7 +55,7 @@ setupSmartIcon({
 
 Each collection is a tab in the picker, and the first in `collections` is the one open by default (`ph` in SmartAdmin). Browse the sets you want at [icon-sets.iconify.design](https://icon-sets.iconify.design), note the `prefix`, and install the matching `@iconify-json/<prefix>`. Stored values carry the prefix (`ant-design:home-outlined`), so no matter which tab you originally picked from, `AppIcon` can always match it.
 
-SmartAdmin doesn't use `preloadPrefix` to warm an entire collection — the full `ph` set is 946 KB gz, too much to eat on first paint. It takes a different path instead: a small `ph` subset, generated from the names actually used, is registered synchronously at startup, and only names outside that subset fall back to `AppIcon` lazy-loading the full `ph` set — see [Theme & Icons](/frontend/appearance).
+SmartAdmin doesn't use `preloadPrefix` to warm an entire collection — the full `ph` set is 946 KB gz, too much to eat on first paint. It takes a different path instead: a `ph` subset is registered synchronously at startup, and only names outside it fall back to `AppIcon` lazy-loading the full `ph` set. There are two subsets — the kernel's ships with the package, and an app generates its own from its `src` with `smart-admin-icons` — see [Theme & Icons](/frontend/appearance).
 
 If you **never call** `setupSmartIcon` at all, the package ships one Lucide set as a fallback (it lists `@iconify-json/lucide` as a runtime dependency), usable on import — SmartAdmin doesn't take that default path, instead explicitly registering four sets: ph / lucide / ep / ant-design. That list lives in the kernel package; icons an app needs beyond it go in as local SVGs, covered next.
 
