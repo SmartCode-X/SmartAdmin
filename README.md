@@ -1,15 +1,29 @@
+<!-- 顶部居中排版只用顶格独占一行的 <div>、</div>、<img>：本文件也是 NuGet 包说明页，nuget.org 不渲染 HTML，
+     打包时这三种行会被删掉（backend/PackageReadme.targets），换成别的标签会在包页上原样露出来。 -->
+
 [English](https://github.com/SmartCode-X/SmartAdmin/blob/main/README.en.md) | 简体中文
+
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/SmartCode-X/SmartAdmin/main/site/public/icon-512.png" width="100" alt="SmartAdmin">
 
 # SmartAdmin
 
-**可替换的企业后台内核**：装上即用，升级只改版本号。
+*可替换的现代企业后台管理内核：AI 辅助开发，简单高效；装上即用，升级只改版本号。*
 
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/SmartCode-X/SmartAdmin/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/SmartCode-X/SmartAdmin?style=social)](https://github.com/SmartCode-X/SmartAdmin/stargazers)
+[![Forks](https://img.shields.io/github/forks/SmartCode-X/SmartAdmin?style=social)](https://github.com/SmartCode-X/SmartAdmin/forks)
 [![NuGet](https://img.shields.io/nuget/v/SmartAdmin)](https://www.nuget.org/packages/SmartAdmin)
 [![npm](https://img.shields.io/npm/v/smart-admin-web)](https://www.npmjs.com/package/smart-admin-web)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/SmartCode-X/SmartAdmin/blob/main/LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/SmartCode-X/SmartAdmin/ci.yml?branch=main&event=push&label=build)](https://github.com/SmartCode-X/SmartAdmin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
-[文档](https://smartcode-x.github.io/SmartAdmin/zh/) · [快速开始](https://smartcode-x.github.io/SmartAdmin/zh/guide/getting-started) · [更新日志](https://github.com/SmartCode-X/SmartAdmin/blob/main/CHANGELOG.md)
+**[📖 文档](https://smartcode-x.github.io/SmartAdmin/zh/) · [🚀 快速开始](https://smartcode-x.github.io/SmartAdmin/zh/guide/getting-started) · [📋 更新日志](https://github.com/SmartCode-X/SmartAdmin/blob/main/CHANGELOG.md)**
+
+</div>
+
+---
 
 ## 这是什么
 

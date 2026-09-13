@@ -1,15 +1,26 @@
 English | [简体中文](https://github.com/SmartCode-X/SmartAdmin/blob/main/README.md)
 
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/SmartCode-X/SmartAdmin/main/site/public/icon-512.png" width="100" alt="SmartAdmin">
+
 # SmartAdmin
 
-**The replaceable admin kernel for .NET.** Install and go. Upgrade by bumping a version.
+*The replaceable, modern admin kernel for .NET. Simple, efficient, AI-assisted development. Install and go, upgrade by bumping a version.*
 
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/SmartCode-X/SmartAdmin/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/SmartCode-X/SmartAdmin?style=social)](https://github.com/SmartCode-X/SmartAdmin/stargazers)
+[![Forks](https://img.shields.io/github/forks/SmartCode-X/SmartAdmin?style=social)](https://github.com/SmartCode-X/SmartAdmin/forks)
 [![NuGet](https://img.shields.io/nuget/v/SmartAdmin)](https://www.nuget.org/packages/SmartAdmin)
 [![npm](https://img.shields.io/npm/v/smart-admin-web)](https://www.npmjs.com/package/smart-admin-web)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/SmartCode-X/SmartAdmin/blob/main/LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/SmartCode-X/SmartAdmin/ci.yml?branch=main&event=push&label=build)](https://github.com/SmartCode-X/SmartAdmin/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
-[Docs](https://smartcode-x.github.io/SmartAdmin/) · [Quick Start](https://smartcode-x.github.io/SmartAdmin/guide/getting-started) · [Changelog](https://github.com/SmartCode-X/SmartAdmin/blob/main/CHANGELOG.md)
+**[📖 Docs](https://smartcode-x.github.io/SmartAdmin/) · [🚀 Quick Start](https://smartcode-x.github.io/SmartAdmin/guide/getting-started) · [📋 Changelog](https://github.com/SmartCode-X/SmartAdmin/blob/main/CHANGELOG.md)**
+
+</div>
+
+---
 
 ## What is it
 
